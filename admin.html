@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>leaderboard admin — betterhomes</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  :root {
+    --slate: #1F343F; --denim: #2C537A; --powder: #7BA0B2;
+    --sand: #D9B9A0; --mist: #EDE8E4; --white: #fff;
+    --ok: #3E7C59; --warn: #B4552D;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--mist); color: var(--slate); font-family: var(--font-epic, "Segoe UI", sans-serif); font-size: 15px; }
+  h1, h2, h3 { font-family: var(--font-serif, Georgia, serif); font-weight: 400; margin: 0; }
+  button { font-family: inherit; font-size: 14px; border: none; border-radius: 3px; padding: 9px 16px; cursor: pointer; background: var(--slate); color: var(--white); }
+  button.ghost { background: transparent; color: var(--slate); border: 1px solid var(--slate); }
+  button.small { padding: 5px 10px; font-size: 13px; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  input, select, textarea { font-family: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #c9c2ba; border-radius: 3px; background: var(--white); color: var(--slate); width: 100%; }
+  label { display: block; font-size: 12px; color: var(--denim); margin: 12px 0 4px; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .toggle input { width: auto; }
+  header { background: var(--slate); color: var(--white); padding: 18px 28px; display: flex; align-items: baseline; gap: 24px; }
+  header .wordmark { font-family: var(--font-serif, Georgia, serif); font-size: 26px; letter-spacing: 0.5px; }
+  header .sub { font-size: 13px; color: var(--sand); }
+  header .right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 13px; }
+  nav { background: var(--white); border-bottom: 1px solid #d8d1c9; padding: 0 28px; display: flex; gap: 4px; }
+  nav button { background: none; color: var(--slate); border-radius: 0; padding: 14px 18px; border-bottom: 3px solid transparent; }
+  nav button.active { border-bottom-color: var(--sand); font-weight: 600; }
+  main { padding: 24px 28px; max-width: 1200px; }
+  .card { background: var(--white); border-radius: 4px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(31,52,63,0.08); }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; color: var(--denim); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #e3ddd5; }
+  td { padding: 9px 10px; border-bottom: 1px solid #efeae4; vertical-align: middle; }
+  tr.rowlink { cursor: pointer; } tr.rowlink:hover { background: #f7f3ef; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+  .pill.on { background: #e2ede6; color: var(--ok); }
+  .pill.off { background: #f0e4dd; color: var(--warn); }
+  .pill.neutral { background: var(--mist); color: var(--denim); }
+  .avatar { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: linear-gradient(160deg, var(--denim), var(--slate)); color: var(--sand); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 15px; }
+  .drawer-back { position: fixed; inset: 0; background: rgba(31,52,63,0.45); display: none; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; max-width: 95vw; background: var(--white); box-shadow: -8px 0 24px rgba(0,0,0,0.2); padding: 26px; overflow-y: auto; display: none; }
+  .drawer h2 { margin-bottom: 2px; }
+  .drawer .muted { color: var(--powder); font-size: 13px; }
+  .mediarow { display: flex; gap: 14px; align-items: center; margin-top: 10px; }
+  .mediarow .preview { width: 84px; height: 84px; border-radius: 6px; object-fit: cover; background: var(--mist); }
+  .statusline { padding: 10px 14px; border-radius: 4px; font-size: 13px; margin-bottom: 16px; }
+  .statusline.ok { background: #e2ede6; color: var(--ok); }
+  .statusline.warn { background: #f6e3d9; color: var(--warn); }
+  #login { max-width: 380px; margin: 12vh auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .searchbar { display: flex; gap: 10px; margin-bottom: 14px; }
+  .searchbar input { max-width: 320px; }
+  .count { color: var(--powder); font-size: 13px; align-self: center; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--slate); color: var(--white); padding: 10px 22px; border-radius: 3px; font-size: 14px; display: none; }
+</style>
+</head>
+<body>
+
+<!-- ====================== LOGIN ====================== -->
+<div id="login">
+  <div class="card">
+    <h1 style="font-size:28px;">leaderboard admin</h1>
+    <p class="muted" style="color:var(--powder); font-size:13px;">betterhomes gamification</p>
+    <label>Email</label><input id="login-email" type="email" autocomplete="username">
+    <label>Password</label><input id="login-pass" type="password" autocomplete="current-password">
+    <div style="margin-top:18px;"><button id="login-btn" style="width:100%;">Sign in</button></div>
+    <p id="login-err" style="color:var(--warn); font-size:13px;"></p>
+  </div>
+</div>
+
+<!-- ====================== APP ====================== -->
+<div id="app" style="display:none;">
+  <header>
+    <span class="wordmark">betterhomes</span>
+    <span class="sub">leaderboard admin</span>
+    <div class="right">
+      <span id="pipeline-pill" class="pill neutral">pipeline: checking…</span>
+      <span id="who"></span>
+      <button class="ghost small" style="border-color:var(--sand); color:var(--sand);" id="signout">Sign out</button>
+    </div>
+  </header>
+  <nav>
+    <button data-tab="brokers" class="active">Brokers</button>
+    <button data-tab="celebrations">Celebrations <span id="celeb-badge"></span></button>
+    <button data-tab="pipeline">Pipeline</button>
+  </nav>
+  <main>
+    <!-- Brokers tab -->
+    <section id="tab-brokers">
+      <div class="searchbar">
+        <input id="broker-search" placeholder="Search name, branch, designation…">
+        <select id="broker-filter" style="max-width:220px;">
+          <option value="board">On leaderboard</option>
+          <option value="brokers">All brokers</option>
+          <option value="all" selected>Everyone</option>
+        </select>
+        <span class="count" id="broker-count"></span>
+        <button class="ghost" id="new-broker" style="margin-left:auto;">Add broker</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead><tr><th></th><th>Name</th><th>Designation</th><th>Branch</th><th>Media</th><th>On board</th></tr></thead>
+          <tbody id="broker-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Celebrations tab -->
+    <section id="tab-celebrations" style="display:none;">
+      <div class="card">
+        <h2 style="font-size:22px; margin-bottom:6px;">Send a celebration</h2>
+        <p style="font-size:13px; color:var(--powder); margin-top:0;">Plays on all screens within moments, for 15 seconds each.</p>
+        <div class="grid2">
+          <div><label>Broker</label><select id="cel-broker"></select></div>
+          <div><label>Headline (e.g. 3 bedrooms in Palm Jumeirah)</label><input id="cel-headline"></div>
+          <div><label>Sale value (AED)</label><input id="cel-value" type="number" min="0"></div>
+          <div><label>Commission value (AED)</label><input id="cel-comm" type="number" min="0"></div>
+        </div>
+        <div style="margin-top:16px;"><button id="cel-send">Send to screens</button></div>
+      </div>
+      <div class="card">
+        <h2 style="font-size:22px; margin-bottom:6px;">Pending approval</h2>
+        <p style="font-size:13px; color:var(--powder); margin-top:0;">Approved celebrations play on the office screens. Add a headline before approving — e.g. “3 bedrooms in Palm Jumeirah”.</p>
+        <table><tbody id="celeb-pending"></tbody></table>
+      </div>
+      <div class="card">
+        <h2 style="font-size:20px;">Recent (approved / played / skipped)</h2>
+        <table><tbody id="celeb-recent"></tbody></table>
+      </div>
+    </section>
+
+    <!-- Pipeline tab -->
+    <section id="tab-pipeline" style="display:none;">
+      <div id="pipeline-status"></div>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead><tr><th>Run date</th><th>Source</th><th>Received</th><th>Upserted</th><th>Status</th><th>Error</th><th>Finished</th></tr></thead>
+          <tbody id="run-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ====================== BROKER DRAWER ====================== -->
+<div class="drawer-back" id="drawer-back"></div>
+<div class="drawer" id="drawer">
+  <h2 id="d-name" style="font-size:26px;"></h2>
+  <p class="muted" id="d-meta"></p>
+
+  <div class="grid2">
+    <div><label>Display name (screens)</label><input id="d-display"></div>
+    <div><label>Designation</label><input id="d-desig"></div>
+    <div><label>Branch</label><input id="d-branch"></div>
+    <div><label>Division</label><input id="d-division"></div>
+  </div>
+  <label>Notes</label><textarea id="d-notes" rows="2"></textarea>
+  <div style="margin-top:14px; display:flex; gap:22px;">
+    <label class="toggle" style="margin:0;"><input type="checkbox" id="d-isbroker"> Is a broker</label>
+    <label class="toggle" style="margin:0;"><input type="checkbox" id="d-onboard"> Show on leaderboard</label>
+  </div>
+  <div style="margin-top:8px;"><label>Left the company (leave empty if active)</label><input id="d-left" type="date" style="max-width:200px;"></div>
+
+  <h3 style="font-size:19px; margin-top:26px;">Media</h3>
+  <p class="muted" style="margin:4px 0 0;">Screens use the webm when ready, otherwise the photo, otherwise initials.</p>
+  <div class="mediarow">
+    <img class="preview" id="d-photo-prev" alt="">
+    <div style="flex:1;">
+      <label style="margin-top:0;">Podium photo (cutout PNG — shown in ranks 1–3 when no video)</label>
+      <input type="file" id="d-photo-file" accept="image/*">
+    </div>
+  </div>
+  <div class="mediarow">
+    <img class="preview" id="d-row-prev" alt="">
+    <div style="flex:1;">
+      <label style="margin-top:0;">Row photo (headshot — shown in the side list, ranks 4+)</label>
+      <input type="file" id="d-row-file" accept="image/*">
+    </div>
+  </div>
+  <div class="mediarow">
+    <video class="preview" id="d-webm-prev" muted loop autoplay playsinline></video>
+    <div style="flex:1;">
+      <label style="margin-top:0;">Portrait video (.webm, transparent)</label>
+      <input type="file" id="d-webm-file" accept="video/webm">
+      <label>Video status (when no file yet)</label>
+      <select id="d-webm-status" style="max-width:220px;">
+        <option value="missing">missing</option>
+        <option value="in_production">in production</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="margin-top:26px; display:flex; gap:10px;">
+    <button id="d-save">Save changes</button>
+    <button class="ghost" id="d-close">Close</button>
+  </div>
+  <p id="d-msg" style="font-size:13px; color:var(--denim);"></p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+/* ================= CONFIG — edit these two lines ================= */
+const SUPABASE_URL = "https://xbjzvtnpbyadolkexsvq.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhianp2dG5wYnlhZG9sa2V4c3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MjMyNjksImV4cCI6MjEwNDQ5OTI2OX0.ieFmzlAuRcNyJdtIo44zj1p0ksyEDMcZ5GsLJxovGJw";
+/* ================================================================= */
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const toast = (m) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; setTimeout(() => t.style.display = "none", 2600); };
+const mediaPublicUrl = (p) => p ? (p.startsWith("http") ? p : `${SUPABASE_URL}/storage/v1/object/public/media/${p}`) : null;
+
+let brokers = [], mediaByBroker = {}, current = null;
+
+/* ---------------- auth ---------------- */
+$("login-btn").onclick = async () => {
+  $("login-err").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("login-email").value.trim(), password: $("login-pass").value });
+  if (error) { $("login-err").textContent = error.message; return; }
+  start();
+};
+$("signout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+sb.auth.getSession().then(({ data }) => { if (data.session) start(); });
+
+async function start() {
+  const { data: { user } } = await sb.auth.getUser();
+  $("who").textContent = user.email;
+  $("login").style.display = "none";
+  $("app").style.display = "block";
+  await Promise.all([loadBrokers(), loadCelebrations(), loadRuns()]);
+  startRealtime();
+}
+
+/* ---------------- realtime ----------------
+   Live updates pushed by Supabase Realtime. Requires the four tables to be
+   added to the `supabase_realtime` publication (see supabase-realtime-setup.sql).
+   If the websocket drops or Realtime isn't enabled yet, we quietly fall back
+   to polling every 90 seconds, and always refresh when the tab regains focus. */
+let realtimeUp = false, fallbackPoll = null;
+const debounce = (fn, ms) => { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
+const refreshBrokers = debounce(loadBrokers, 700);
+const refreshCelebrations = debounce(loadCelebrations, 400);
+const refreshRuns = debounce(loadRuns, 700);
+const refreshAll = () => { loadBrokers(); loadCelebrations(); loadRuns(); };
+
+function startRealtime() {
+  sb.channel("admin-live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "brokers" }, refreshBrokers)
+    .on("postgres_changes", { event: "*", schema: "public", table: "media_assets" }, refreshBrokers)
+    .on("postgres_changes", { event: "*", schema: "public", table: "celebration_events" }, refreshCelebrations)
+    .on("postgres_changes", { event: "*", schema: "public", table: "ingestion_runs" }, refreshRuns)
+    .subscribe((status) => {
+      realtimeUp = (status === "SUBSCRIBED");
+      clearInterval(fallbackPoll);
+      if (!realtimeUp) fallbackPoll = setInterval(refreshAll, 90000);
+    });
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && $("app").style.display !== "none") refreshAll();
+});
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  ["brokers", "celebrations", "pipeline"].forEach(t => $(`tab-${t}`).style.display = (b.dataset.tab === t ? "block" : "none"));
+});
+
+/* ---------------- brokers ---------------- */
+async function loadBrokers() {
+  const { data, error } = await sb.from("brokers").select("*").order("full_name");
+  if (error) { toast(error.message); return; }
+  brokers = data;
+  const { data: media } = await sb.from("media_assets").select("*").order("priority");
+  mediaByBroker = {};
+  (media || []).forEach(m => { (mediaByBroker[m.broker_id] ||= []).push(m); });
+  $("cel-broker").innerHTML = `<option value="">Select a broker…</option>` +
+    brokers.filter(b => b.is_broker)
+      .map(b => `<option value="${b.id}">${b.display_name || b.full_name}${b.branch_name ? " — " + b.branch_name : ""}</option>`)
+      .join("");
+  renderBrokers();
+}
+
+function bestMedia(bid, kind, variant) {
+  const list = (mediaByBroker[bid] || []).filter(m => m.kind === kind && m.status === "ready" && m.storage_path);
+  if (!variant) return list[0] || null;
+  return list.find(m => m.variant === variant)
+      || (variant === "podium" ? list.find(m => m.variant === "default") : null)
+      || null;
+}
+function initials(n) { return (n || "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join(""); }
+
+function renderBrokers() {
+  const q = $("broker-search").value.trim().toLowerCase();
+  const f = $("broker-filter").value;
+  const rows = brokers.filter(b => {
+    if (f === "board" && !b.show_on_leaderboard) return false;
+    if (f === "brokers" && !b.is_broker) return false;
+    if (q && !`${b.full_name} ${b.display_name || ""} ${b.designation || ""} ${b.branch_name || ""}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $("broker-count").textContent = `${rows.length} shown`;
+  $("broker-rows").innerHTML = rows.map(b => {
+    const photo = bestMedia(b.id, "photo", "row") || bestMedia(b.id, "photo", "podium"), webm = bestMedia(b.id, "webm");
+    const av = photo ? `<img class="avatar" src="${mediaPublicUrl(photo.storage_path)}">` : `<span class="avatar">${initials(b.display_name || b.full_name)}</span>`;
+    const mediaPill = webm ? `<span class="pill on">webm</span>` : photo ? `<span class="pill neutral">photo</span>` : `<span class="pill off">initials</span>`;
+    return `<tr class="rowlink" data-id="${b.id}">
+      <td>${av}</td>
+      <td><strong>${b.display_name || b.full_name}</strong>${b.left_at ? ' <span class="pill off">left</span>' : ""}</td>
+      <td>${b.designation || ""}</td><td>${b.branch_name || ""}</td>
+      <td>${mediaPill}</td>
+      <td>${b.show_on_leaderboard ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>'}</td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll("#broker-rows tr").forEach(tr => tr.onclick = () => openDrawer(Number(tr.dataset.id)));
+}
+$("broker-search").oninput = renderBrokers;
+$("broker-filter").onchange = renderBrokers;
+
+$("new-broker").onclick = async () => {
+  const sid = prompt("Source agent id (users.id from the CMS extract):");
+  if (!sid) return;
+  const name = prompt("Full name:");
+  if (!name) return;
+  const { data, error } = await sb.from("brokers")
+    .insert({ source_agent_id: Number(sid), full_name: name, is_broker: true, show_on_leaderboard: false, source_status: "Enabled" })
+    .select().single();
+  if (error) { toast(error.message); return; }
+  brokers.push(data); renderBrokers(); openDrawer(data.id);
+};
+
+/* ---------------- drawer ---------------- */
+function openDrawer(id) {
+  current = brokers.find(b => b.id === id);
+  $("d-name").textContent = current.full_name;
+  $("d-meta").textContent = `source id ${current.source_agent_id} · ${current.source_status || ""}`;
+  $("d-display").value = current.display_name || "";
+  $("d-desig").value = current.designation || "";
+  $("d-branch").value = current.branch_name || "";
+  $("d-division").value = current.division || "";
+  $("d-notes").value = current.notes || "";
+  $("d-isbroker").checked = !!current.is_broker;
+  $("d-onboard").checked = !!current.show_on_leaderboard;
+  $("d-left").value = current.left_at || "";
+  const photo = bestMedia(id, "photo", "podium"), rowPhoto = bestMedia(id, "photo", "row"), webm = bestMedia(id, "webm");
+  $("d-photo-prev").src = photo ? mediaPublicUrl(photo.storage_path) : "";
+  $("d-row-prev").src = rowPhoto ? mediaPublicUrl(rowPhoto.storage_path) : "";
+  $("d-webm-prev").src = webm ? mediaPublicUrl(webm.storage_path) : "";
+  $("d-photo-file").value = ""; $("d-row-file").value = ""; $("d-webm-file").value = "";
+  const wRow = (mediaByBroker[id] || []).find(m => m.kind === "webm");
+  $("d-webm-status").value = wRow && !wRow.storage_path ? wRow.status : "missing";
+  $("d-msg").textContent = "";
+  $("drawer").style.display = "block"; $("drawer-back").style.display = "block";
+}
+const closeDrawer = () => { $("drawer").style.display = "none"; $("drawer-back").style.display = "none"; current = null; };
+$("d-close").onclick = closeDrawer; $("drawer-back").onclick = closeDrawer;
+
+async function uploadAsset(brokerId, kind, file, variant = "default") {
+  const ext = file.name.split(".").pop().toLowerCase();
+  const path = `${brokerId}/${kind}-${variant}-${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from("media").upload(path, file, { upsert: true });
+  if (upErr) throw upErr;
+  const { error: dbErr } = await sb.from("media_assets")
+    .insert({ broker_id: brokerId, kind, status: "ready", storage_path: path, priority: 10, variant });
+  if (dbErr) throw dbErr;
+}
+
+$("d-save").onclick = async () => {
+  if (!current) return;
+  $("d-save").disabled = true; $("d-msg").textContent = "Saving…";
+  try {
+    const patch = {
+      display_name: $("d-display").value.trim() || null,
+      designation: $("d-desig").value.trim() || null,
+      branch_name: $("d-branch").value.trim() || null,
+      division: $("d-division").value.trim() || null,
+      notes: $("d-notes").value.trim() || null,
+      is_broker: $("d-isbroker").checked,
+      show_on_leaderboard: $("d-onboard").checked,
+      left_at: $("d-left").value || null,
+    };
+    const { error } = await sb.from("brokers").update(patch).eq("id", current.id);
+    if (error) throw error;
+
+    const photoFile = $("d-photo-file").files[0];
+    if (photoFile) await uploadAsset(current.id, "photo", photoFile, "podium");
+    const rowFile = $("d-row-file").files[0];
+    if (rowFile) await uploadAsset(current.id, "photo", rowFile, "row");
+    const webmFile = $("d-webm-file").files[0];
+    if (webmFile) await uploadAsset(current.id, "webm", webmFile, "default");
+
+    if (!webmFile && !bestMedia(current.id, "webm")) {
+      // track production status for a video that doesn't exist yet
+      const status = $("d-webm-status").value;
+      const existing = (mediaByBroker[current.id] || []).find(m => m.kind === "webm" && !m.storage_path);
+      if (existing) await sb.from("media_assets").update({ status }).eq("id", existing.id);
+      else if (status === "in_production") await sb.from("media_assets").insert({ broker_id: current.id, kind: "webm", status, priority: 100 });
+    }
+
+    toast("Saved");
+    closeDrawer();
+    await loadBrokers();
+  } catch (e) { $("d-msg").textContent = e.message; }
+  $("d-save").disabled = false;
+};
+
+/* ---------------- celebrations ---------------- */
+async function loadCelebrations() {
+  const { data, error } = await sb.from("celebration_events")
+    .select("*, brokers(full_name, display_name, branch_name)").order("created_at", { ascending: false }).limit(60);
+  if (error) { toast(error.message); return; }
+  const pending = data.filter(c => c.state === "pending");
+  $("celeb-badge").textContent = pending.length ? `(${pending.length})` : "";
+  // keep any half-typed headline if a live update re-renders the table mid-typing
+  const drafts = {};
+  document.querySelectorAll('#celeb-pending input[id^="hl-"]').forEach(i => { if (i.value.trim()) drafts[i.id] = i.value; });
+  const fmt = (v) => v == null ? "" : `AED ${Number(v).toLocaleString("en-US")}`;
+  const bname = (c) => c.brokers ? (c.brokers.display_name || c.brokers.full_name) : `broker #${c.broker_id}`;
+  $("celeb-pending").innerHTML = pending.length ? pending.map(c => `
+    <tr>
+      <td><strong>${bname(c)}</strong><br><span style="font-size:12px;color:var(--powder);">deal ${c.deal_id}</span></td>
+      <td>${fmt(c.sale_value)}<br><span style="font-size:12px;color:var(--powder);">commission ${fmt(c.commission_value)}</span></td>
+      <td style="width:38%;"><input placeholder="Headline — e.g. 3 bedrooms in Palm Jumeirah" id="hl-${c.id}" value="${c.headline || ""}"></td>
+      <td style="white-space:nowrap;">
+        <button class="small" onclick="window._approve(${c.id})">Approve</button>
+        <button class="small ghost" onclick="window._skip(${c.id})">Skip</button>
+      </td>
+    </tr>`).join("") : `<tr><td style="color:var(--powder);">Nothing pending — new closed deals appear here automatically.</td></tr>`;
+  $("celeb-recent").innerHTML = data.filter(c => c.state !== "pending").slice(0, 15).map(c => `
+    <tr><td>${bname(c)}</td><td>${c.headline || ""}</td><td>${fmt(c.sale_value)}</td>
+    <td><span class="pill ${c.state === "played" ? "on" : "neutral"}">${c.state}</span></td>
+    <td style="text-align:right;">${c.state === "approved" ? "" : `<button class="small ghost" onclick="window._replay(${c.id})">Play again</button>`}</td></tr>`).join("");
+  Object.entries(drafts).forEach(([id, v]) => { const el = $(id); if (el && !el.value.trim()) el.value = v; });
+}
+window._approve = async (id) => {
+  const headline = $(`hl-${id}`).value.trim();
+  if (!headline) { toast("Add a headline first"); return; }
+  const { error } = await sb.from("celebration_events").update({ state: "approved", headline }).eq("id", id);
+  if (error) toast(error.message); else { toast("Approved — will play on screens"); loadCelebrations(); }
+};
+window._replay = async (id) => {
+  const { error } = await sb.from("celebration_events").update({ state: "approved" }).eq("id", id);
+  if (error) toast(error.message); else { toast("Queued again — screens will play it shortly"); loadCelebrations(); }
+};
+window._skip = async (id) => {
+  const { error } = await sb.from("celebration_events").update({ state: "skipped" }).eq("id", id);
+  if (error) toast(error.message); else loadCelebrations();
+};
+
+$("cel-send").onclick = async () => {
+  const broker_id = Number($("cel-broker").value);
+  const headline = $("cel-headline").value.trim();
+  if (!broker_id) { toast("Choose a broker"); return; }
+  if (!headline) { toast("Add a headline"); return; }
+  $("cel-send").disabled = true;
+  const { error } = await sb.from("celebration_events").insert({
+    broker_id, headline,
+    sale_value: Number($("cel-value").value) || null,
+    commission_value: Number($("cel-comm").value) || null,
+    state: "approved",
+  });
+  $("cel-send").disabled = false;
+  if (error) { toast(error.message); return; }
+  toast("Sent — screens will play it in a moment");
+  $("cel-headline").value = ""; $("cel-value").value = ""; $("cel-comm").value = ""; $("cel-broker").value = "";
+  loadCelebrations();
+};
+
+/* ---------------- pipeline ---------------- */
+async function loadRuns() {
+  const { data, error } = await sb.from("ingestion_runs").select("*").order("id", { ascending: false }).limit(20);
+  if (error) { toast(error.message); return; }
+  $("run-rows").innerHTML = data.map(r => `
+    <tr><td>${r.run_date}</td><td>${r.source}</td><td>${r.rows_received ?? ""}</td><td>${r.rows_upserted ?? ""}</td>
+    <td><span class="pill ${r.status === "success" ? "on" : "off"}">${r.status}</span></td>
+    <td style="font-size:12px; max-width:280px;">${r.error || ""}</td>
+    <td style="font-size:12px;">${new Date(r.finished_at || r.started_at).toLocaleString("en-GB")}</td></tr>`).join("");
+
+  const latestOk = data.find(r => r.status === "success");
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const healthy = latestOk && latestOk.run_date >= yesterday;
+  $("pipeline-pill").className = `pill ${healthy ? "on" : "off"}`;
+  $("pipeline-pill").textContent = healthy ? `pipeline: ok (${latestOk.run_date})` : "pipeline: attention";
+  $("pipeline-status").innerHTML = healthy
+    ? `<div class="statusline ok">Latest successful ingest covers ${latestOk.run_date} — the pipeline is healthy.</div>`
+    : `<div class="statusline warn">No successful ingest for yesterday yet. Check the Metabase alert, the n8n workflow, and the rows below.</div>`;
+}
+</script>
+</body>
+</html>

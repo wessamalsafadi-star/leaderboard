@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>betterhomes — leaderboard</title>
+<link rel="stylesheet" href="fonts.css">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<style>
+  :root {
+    --bh-slate-blue: #1F343F; --bh-denim-blue: #2C537A; --bh-powder-blue: #7BA0B2;
+    --bh-sand: #D9B9A0; --bh-mist: #EDE8E4; --bh-white: #FFFFFF;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bh-slate-blue); overflow: hidden; cursor: none; }
+  .scene { position: absolute; inset: 0; opacity: 0; transition: opacity 900ms ease; pointer-events: none; }
+  .scene.active { opacity: 1; }
+  .chip { border-radius: 2px; background: rgba(0,0,0,0.09); backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center; }
+  .row-panel { position: absolute; left: 1212px; width: 636px; height: 132px; border-radius: 4px;
+    background: rgba(255,255,255,0.02); backdrop-filter: blur(11px);
+    box-shadow: inset 0 0 0 0.4px rgba(255,255,255,0.22); }
+  /* ---- portrait rendering -------------------------------------------------
+     Transparent webms fill their slot freely (like the mockups).
+     Photos / initials render as a designed portrait card anchored to the
+     bottom of the slot — never a full-slot slab. */
+  .media-slot { position: absolute; display: flex; align-items: flex-end; justify-content: center; }
+  .media-slot video.alpha { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; }
+  .media-slot img.cutout { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; }
+  .portrait-card { width: 68%; aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden;
+    background: rgba(255,255,255,0.03); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center; }
+  .portrait-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .portrait-card .init { font-family: var(--font-serif); color: var(--bh-sand); }
+  .tile { position: relative; overflow: visible; width: 100%; height: 100%; }
+  .tile .dia { position: absolute; left: 12%; right: 12%; top: 12%; bottom: 12%;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    background: rgba(125,132,136,0.32); }
+  .tile img { position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%);
+    height: 92%; max-width: 100%; object-fit: contain; object-position: bottom center; }
+  .tile .init { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-serif); font-size: 48px; color: var(--bh-sand); }
+  /* soft dark glow behind names — from the original design's glow layers */
+  .name-glow { background: radial-gradient(50% 55% at 50% 50%, rgba(10,20,26,0.45) 0%, rgba(10,20,26,0) 100%);
+    backdrop-filter: blur(9px);
+    -webkit-mask-image: radial-gradient(closest-side, #000 45%, transparent 100%);
+    mask-image: radial-gradient(closest-side, #000 45%, transparent 100%); }
+</style>
+</head>
+<body>
+<div id="viewport" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:var(--bh-slate-blue);">
+<div id="stage" style="position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bh-slate-blue); font-family:var(--font-serif); transform-origin:center center; flex-shrink:0;">
+
+  <!-- Shared background + gradient -->
+  <img id="bg-hero" src="assets/bg-hero.png" alt="" onerror="this.remove()"
+       style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">
+  <video id="bg-video" autoplay muted playsinline loop style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none;"></video>
+  <div style="position:absolute; inset:0; background:linear-gradient(180.061deg, rgba(31,52,63,0) 44.01%, rgb(31,52,63) 99.91%); pointer-events:none;"></div>
+
+  <!-- Shared date / time chips -->
+  <div class="chip" style="position:absolute; left:1335px; top:52px; width:279px; height:54px; gap:10px; z-index:20;">
+    <i class="ph ph-calendar-blank" style="font-size:22px; color:var(--bh-sand);"></i>
+    <span id="live-date" style="font-family:var(--font-epic); font-size:24px; white-space:nowrap; color:var(--bh-white);"></span>
+  </div>
+  <div class="chip" style="position:absolute; left:1628px; top:52px; width:220px; height:54px; gap:10px; z-index:20;">
+    <i class="ph ph-clock" style="font-size:22px; color:var(--bh-sand);"></i>
+    <span id="live-time" style="font-family:var(--font-epic); font-size:24px; white-space:nowrap; color:var(--bh-white);"></span>
+  </div>
+
+  <!-- ==================== SCENE: LEADERBOARD ==================== -->
+  <div class="scene" id="scene-board">
+    <span id="board-title" style="position:absolute; left:0px; top:60px; width:1180px; font-family:var(--font-serif); font-weight:400; font-size:118px; text-align:center; white-space:nowrap; line-height:1; color:var(--bh-white); z-index:5;"></span>
+
+    <!-- 1st -->
+    <div class="media-slot" id="p1-media" style="left:-20px; top:55px; width:700px; height:905px;"></div>
+    <span style="position:absolute; left:434px; top:315px; font-family:var(--font-serif); font-size:172px; line-height:1.2; color:var(--bh-sand); z-index:6;">1<span style="font-size:0.48em; vertical-align:sub;">st</span></span>
+    <div class="chip" style="position:absolute; left:430px; top:507px; min-width:266px; height:78px; padding:0 24px; z-index:6;">
+      <span id="p1-value" style="font-family:var(--font-serif); font-weight:600; font-size:51px; white-space:nowrap; color:var(--bh-white);"></span>
+    </div>
+    <div class="name-glow" style="position:absolute; left:20px; top:713px; width:620px; padding:46px 40px; display:flex; flex-direction:column; gap:4px; align-items:center; z-index:6;">
+      <span id="p1-name" style="font-family:var(--font-serif); font-size:51px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
+      <span id="p1-title" style="font-family:var(--font-epic); font-size:21px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
+    </div>
+
+    <!-- 2nd -->
+    <div class="media-slot" id="p2-media" style="left:749px; top:136px; width:470px; height:400px;"></div>
+    <span style="position:absolute; left:722px; top:246px; font-family:var(--font-serif); font-size:118px; line-height:1.2; color:var(--bh-sand); z-index:6;">2<span style="font-size:0.48em; vertical-align:sub;">nd</span></span>
+    <div class="chip" style="position:absolute; left:724px; top:372px; min-width:209px; height:61px; padding:0 20px; z-index:6;">
+      <span id="p2-value" style="font-family:var(--font-serif); font-weight:600; font-size:41px; white-space:nowrap; color:var(--bh-white);"></span>
+    </div>
+    <div class="name-glow" style="position:absolute; left:768px; top:504px; width:407px; padding:40px; display:flex; flex-direction:column; gap:3px; align-items:center; z-index:6;">
+      <span id="p2-name" style="font-family:var(--font-serif); font-size:44px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
+      <span id="p2-title" style="font-family:var(--font-epic); font-size:18px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
+    </div>
+
+    <!-- 3rd -->
+    <div class="media-slot" id="p3-media" style="left:557px; top:640px; width:469px; height:314px;"></div>
+    <span style="position:absolute; left:869px; top:729px; font-family:var(--font-serif); font-size:102px; line-height:1.2; color:var(--bh-sand); z-index:6;">3<span style="font-size:0.48em; vertical-align:sub;">rd</span></span>
+    <div class="chip" style="position:absolute; left:870px; top:841px; min-width:163px; height:57px; padding:0 18px; z-index:6;">
+      <span id="p3-value" style="font-family:var(--font-serif); font-weight:600; font-size:31px; white-space:nowrap; color:var(--bh-white);"></span>
+    </div>
+    <div class="name-glow" style="position:absolute; left:561px; top:919px; width:407px; padding:38px 40px; display:flex; flex-direction:column; align-items:center; z-index:6;">
+      <span id="p3-name" style="font-family:var(--font-serif); font-size:40px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
+      <span id="p3-title" style="font-family:var(--font-epic); font-size:18px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
+    </div>
+
+    <div style="position:absolute; left:0; top:0; transform:matrix(0,-1,1,0,1195,137); transform-origin:0 0; width:137px; height:663px; background:linear-gradient(90deg, rgba(29,49,59,0) 0%, rgb(29,49,59) 100%); pointer-events:none;"></div>
+    <div id="rows"></div>
+  </div>
+
+  <!-- ==================== SCENE: CONGRATULATIONS ==================== -->
+  <div class="scene" id="scene-congrats">
+    <span style="position:absolute; left:18px; top:47px; width:1878px; font-family:var(--font-serif); font-size:225px; text-align:center; white-space:nowrap; line-height:1; color:var(--bh-white);">Congratulations</span>
+    <div style="position:absolute; left:45px; top:500px; width:924px; display:flex; flex-direction:column; align-items:center; gap:6px;">
+      <span id="c-headline" style="font-family:var(--font-epic); font-size:27px; text-align:center; color:var(--bh-white);"></span>
+      <span id="c-value" style="font-family:var(--font-serif); font-weight:600; font-size:120px; text-align:center; white-space:nowrap; line-height:1.35; color:var(--bh-sand);"></span>
+      <span style="font-family:var(--font-epic); font-size:40px; text-align:center; color:var(--bh-white);">Sale value</span>
+      <span id="c-commission" style="font-family:var(--font-epic); font-size:70px; text-align:center; line-height:1.2; color:var(--bh-white); margin-top:56px;"></span>
+      <span style="font-family:var(--font-epic); font-size:24px; text-align:center; color:var(--bh-white);">Commission value</span>
+    </div>
+    <div class="media-slot" id="c-media" style="left:1009px; top:120px; width:865px; height:800px;"></div>
+    <div class="name-glow" style="position:absolute; left:1035px; top:902px; width:780px; padding:38px 40px; display:flex; flex-direction:column; gap:5px; align-items:center;">
+      <span id="c-name" style="font-family:var(--font-serif); font-size:58px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
+      <span id="c-title" style="font-family:var(--font-epic); font-size:29px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
+    </div>
+  </div>
+
+  <span id="status" style="position:absolute; left:16px; bottom:10px; font-family:var(--font-epic); font-size:12px; color:rgba(255,255,255,0.3); z-index:30;"></span>
+</div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG
+===================================================================== */
+const CONFIG = {
+  SUPABASE_URL: "https://xbjzvtnpbyadolkexsvq.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhianp2dG5wYnlhZG9sa2V4c3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MjMyNjksImV4cCI6MjEwNDQ5OTI2OX0.ieFmzlAuRcNyJdtIo44zj1p0ksyEDMcZ5GsLJxovGJw",
+  TIMEZONE_OFFSET_HOURS: 4,        // Asia/Dubai — used for month boundaries
+  STORAGE_BUCKET: "media",
+  BG_VIDEO_URL: null,              // optional looping hero webm
+  REFRESH_MINUTES: 5,              // re-fetch board data
+  CELEBRATION_POLL_SECONDS: 30,    // how often to check the approval queue
+  CELEBRATION_SECONDS: 15,         // how long each celebration plays
+  CELEBRATION_GAP_SECONDS: 3,      // breather between back-to-back celebrations
+  SCENES: [
+    { title: "Reservation value", metric: "rank_by_value",      date_field: "reserved", seconds: 60 },
+    { title: "Closed deals",      metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
+  ],
+};
+
+/* =====================================================================
+   Helpers
+===================================================================== */
+const sbHeaders = { "apikey": CONFIG.SUPABASE_ANON_KEY, "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`, "Content-Type": "application/json" };
+const rpc = async (fn, body = {}) => {
+  const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/rpc/${fn}`, { method: "POST", headers: sbHeaders, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`${fn} ${res.status}: ${await res.text()}`);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+};
+
+/* Month boundaries in DUBAI time, not UTC (the Aug-31 bug fix) */
+function periodBounds() {
+  const nowDubai = new Date(Date.now() + CONFIG.TIMEZONE_OFFSET_HOURS * 3600000);
+  const y = nowDubai.getUTCFullYear(), m = nowDubai.getUTCMonth();
+  const pad = (n) => String(n + 1).padStart(2, "0");
+  const start = `${y}-${pad(m)}-01`;
+  const end = m === 11 ? `${y + 1}-01-01` : `${y}-${pad(m + 1)}-01`;
+  // shift boundaries so "month" means Dubai-midnight to Dubai-midnight
+  const tz = `T00:00:00+04:00`;
+  return [start + tz, end + tz, start];
+}
+
+const mediaUrl = (p) => !p ? null : (/^https?:\/\//.test(p) ? p : `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${p}`);
+const initials = (n) => (n || "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
+const firstLast = (n) => { const p = (n || "").trim().split(/\s+/); return p.length <= 1 ? [n || "", ""] : [p[0], p.slice(1).join(" ")]; };
+
+function fmtValue(v) {
+  const n = Number(v) || 0;
+  if (n >= 1_000_000) { const m = n / 1_000_000; return `AED ${m >= 100 ? m.toFixed(0) : m.toFixed(1).replace(/\.0$/, "")}M`; }
+  if (n >= 1_000) return `AED ${Math.round(n / 1000)}K`;
+  return `AED ${n.toLocaleString("en-US")}`;
+}
+const fmtDateShort = (iso) => !iso ? "" : new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/* Portrait renderers:
+   - transparent webm -> fills the slot, bottom-anchored (mockup behaviour)
+   - photo -> designed portrait card
+   - nothing -> portrait card with initials */
+function renderPortrait(slot, entry, initialsPx) {
+  slot.innerHTML = "";
+  const url = mediaUrl(entry?.media_url);
+  if (url && entry.media_type === "webm") {
+    const v = document.createElement("video");
+    v.className = "alpha"; v.src = url; v.autoplay = true; v.muted = true; v.playsInline = true; v.loop = true;
+    v.onerror = () => renderPortrait(slot, { ...entry, media_type: "photo", media_url: entry.photo_url || null }, initialsPx);
+    slot.appendChild(v); v.play().catch(() => {});
+    return;
+  }
+  if (url && entry.media_type === "photo") {
+    // cutout portrait fills the slot exactly like the mockup webms
+    const img = document.createElement("img");
+    img.className = "cutout"; img.src = url; img.alt = entry?.name || "";
+    img.onerror = () => {
+      slot.innerHTML = `<div class="portrait-card"><span class="init" style="font-size:${initialsPx}px;">${initials(entry?.name)}</span></div>`;
+    };
+    slot.appendChild(img);
+    return;
+  }
+  slot.innerHTML = `<div class="portrait-card"><span class="init" style="font-size:${initialsPx}px;">${initials(entry?.name)}</span></div>`;
+}
+
+function renderTile(slot, entry) {
+  slot.innerHTML = "";
+  const t = document.createElement("div");
+  t.className = "tile";
+  const dia = document.createElement("div");
+  dia.className = "dia";
+  t.appendChild(dia);
+  const url = mediaUrl(entry?.row_photo_url);
+  if (url) {
+    const img = document.createElement("img");
+    img.src = url;
+    img.onerror = () => { img.remove(); const s = document.createElement("span"); s.className = "init"; s.textContent = initials(entry?.name); t.appendChild(s); };
+    t.appendChild(img);
+  } else {
+    const s = document.createElement("span");
+    s.className = "init"; s.textContent = initials(entry?.name);
+    t.appendChild(s);
+  }
+  slot.appendChild(t);
+}
+
+/* =====================================================================
+   Board rows 4th–8th
+===================================================================== */
+const ROW_TOPS = [166, 344, 522, 700, 877], PHOTO_TOPS = [119, 296, 474, 653, 831];
+document.getElementById("rows").innerHTML = ROW_TOPS.map((top, i) => {
+  const rank = i + 4, pTop = PHOTO_TOPS[i];
+  return `
+  <div class="media-slot" id="r${rank}-media" style="left:1342px; top:${pTop}px; width:196px; height:197px; z-index:2;"></div>
+  <div class="row-panel" style="top:${top}px;">
+    <span id="r${rank}-name" style="position:absolute; top:32px; right:36px; max-width:210px; font-family:var(--font-serif); font-size:22px; text-align:right; line-height:1.15; color:var(--bh-white);"></span>
+    <span id="r${rank}-division" style="position:absolute; top:98px; right:36px; font-family:var(--font-epic); font-size:10px; text-align:right; color:rgba(255,255,255,0.8);"></span>
+  </div>
+  <span style="position:absolute; left:1248px; top:${top + 2}px; font-family:var(--font-serif); font-size:84px; line-height:1.1; color:var(--bh-sand); z-index:3;">${rank}<span style="font-size:0.48em; vertical-align:sub;">th</span></span>
+  <span id="r${rank}-value" style="position:absolute; left:1536px; top:${top + 32}px; width:152px; font-family:var(--font-serif); font-weight:600; font-size:36px; text-align:center; white-space:nowrap; color:var(--bh-white); z-index:3;"></span>
+  <div class="chip" style="position:absolute; left:1248px; top:${top + 96}px; min-width:118px; height:28px; padding:0 10px; z-index:3;">
+    <span id="r${rank}-date" style="font-family:var(--font-epic); font-weight:500; font-size:12px; white-space:nowrap; color:var(--bh-white);"></span>
+  </div>`;
+}).join("");
+
+/* =====================================================================
+   Data
+===================================================================== */
+const boardCache = {}; // per date_field
+
+async function fetchBoard(scene) {
+  const [start, end] = periodBounds();
+  const rows = await rpc("leaderboard", { p_start: start, p_end: end, p_date_field: scene.date_field });
+  rows.sort((a, b) => a[scene.metric] - b[scene.metric]);
+  boardCache[scene.date_field + scene.metric] = rows.slice(0, 8);
+}
+
+function valueFor(entry, metric) {
+  if (metric === "rank_by_commission") return fmtValue(entry.total_gross_commission);
+  if (metric === "rank_by_deals") return `${entry.deals} deals`;
+  return fmtValue(entry.total_value);
+}
+
+function renderBoard(scene) {
+  const rows = boardCache[scene.date_field + scene.metric] || [];
+  document.getElementById("board-title").textContent = scene.title;
+  [1, 2, 3].forEach((rank, idx) => {
+    const e = rows[idx];
+    document.getElementById(`p${rank}-name`).textContent = e ? e.name : "—";
+    document.getElementById(`p${rank}-title`).textContent = e ? (e.designation || e.branch_name || "") : "";
+    document.getElementById(`p${rank}-value`).textContent = e ? valueFor(e, scene.metric) : "";
+    renderPortrait(document.getElementById(`p${rank}-media`), e, rank === 1 ? 150 : 100);
+  });
+  for (let i = 0; i < 5; i++) {
+    const rank = i + 4, e = rows[3 + i];
+    const nameEl = document.getElementById(`r${rank}-name`);
+    if (!e) { nameEl.textContent = ""; ["value", "date", "division"].forEach(k => document.getElementById(`r${rank}-${k}`).textContent = ""); document.getElementById(`r${rank}-media`).innerHTML = ""; continue; }
+    const [f, l] = firstLast(e.name);
+    nameEl.innerHTML = l ? `${f}<br>${l}` : f;
+    document.getElementById(`r${rank}-value`).textContent = valueFor(e, scene.metric).replace(/^AED\s*/, "");
+    document.getElementById(`r${rank}-date`).textContent = fmtDateShort(e.last_deal_at);
+    document.getElementById(`r${rank}-division`).textContent = e.branch_name || "";
+    renderTile(document.getElementById(`r${rank}-media`), e);
+  }
+}
+
+/* =====================================================================
+   Celebrations (take-over)
+===================================================================== */
+let celebrationQueue = [], celebrating = false;
+
+async function pollCelebrations() {
+  try {
+    const pending = await rpc("pending_celebrations") || [];
+    const known = new Set(celebrationQueue.map(c => c.id));
+    pending.forEach(c => { if (!known.has(c.id)) celebrationQueue.push(c); });
+  } catch (e) { /* silent; board keeps playing */ }
+}
+
+async function playCelebration(c) {
+  celebrating = true;
+  document.getElementById("c-headline").textContent = c.headline || "";
+  document.getElementById("c-value").textContent = fmtValue(c.sale_value);
+  document.getElementById("c-commission").textContent = fmtValue(c.commission_value);
+  document.getElementById("c-name").textContent = c.name || "";
+  document.getElementById("c-title").textContent = c.designation || "";
+  renderPortrait(document.getElementById("c-media"), c, 170);
+  showScene("scene-congrats");
+  await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_SECONDS * 1000));
+  try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
+  celebrating = false;
+}
+
+/* =====================================================================
+   Scene loop
+===================================================================== */
+function showScene(id) {
+  document.querySelectorAll(".scene").forEach(s => s.classList.toggle("active", s.id === id));
+}
+
+async function loop() {
+  let i = 0;
+  for (;;) {
+    // Celebrations take priority over the rotation
+    if (celebrationQueue.length) {
+      await playCelebration(celebrationQueue.shift());
+      if (celebrationQueue.length) {
+        // more queued: fade to the background for a beat so each one lands as its own moment
+        showScene("");
+        await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_GAP_SECONDS * 1000));
+      }
+      continue;
+    }
+    const scene = CONFIG.SCENES[i % CONFIG.SCENES.length]; i++;
+    try { await fetchBoard(scene); renderBoard(scene); setStatus(scene); } catch (e) { setStatus(scene, e); }
+    showScene("scene-board");
+    // wait scene.seconds, but wake early if a celebration arrives
+    const until = Date.now() + scene.seconds * 1000;
+    while (Date.now() < until && !celebrationQueue.length) await new Promise(r => setTimeout(r, 1000));
+  }
+}
+
+function setStatus(scene, err) {
+  const [, , label] = periodBounds();
+  document.getElementById("status").textContent = err
+    ? `Refresh failed — showing last known board · ${err.message}`
+    : `${scene.title} · period from ${label} · updated ${new Date().toLocaleTimeString("en-GB")}`;
+}
+
+/* =====================================================================
+   Clock, scale, boot
+===================================================================== */
+function tickClock() {
+  const now = new Date();
+  document.getElementById("live-date").textContent = now.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+  let h = now.getHours(); const ampm = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+  document.getElementById("live-time").textContent = `${h} : ${String(now.getMinutes()).padStart(2, "0")} : ${String(now.getSeconds()).padStart(2, "0")} ${ampm}`;
+}
+function fitStage() {
+  const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.getElementById("stage").style.transform = `scale(${s > 0 ? s : 1})`;
+}
+
+/* =====================================================================
+   Realtime + housekeeping
+   - Supabase Realtime pushes celebration changes instantly; the 30s poll
+     below stays on as a safety net, so a CDN or websocket failure can
+     never take the player down. Loaded dynamically for the same reason.
+   - Requires celebration_events in the `supabase_realtime` publication
+     and a SELECT policy for the anon role (see supabase-realtime-setup.sql).
+   - A screen left on for weeks accumulates cruft, so we hard-reload the
+     page once a day at 04:10 local time.
+===================================================================== */
+async function startRealtime() {
+  try {
+    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+    const sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    sb.channel("player-celebrations")
+      .on("postgres_changes", { event: "*", schema: "public", table: "celebration_events" }, () => pollCelebrations())
+      .subscribe();
+  } catch (e) { /* realtime unavailable — polling covers us */ }
+}
+
+function scheduleDailyReload() {
+  const now = new Date(), next = new Date(now);
+  next.setHours(4, 10, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  setTimeout(() => location.reload(), next - now);
+}
+
+(function boot() {
+  if (CONFIG.BG_VIDEO_URL) { const bg = document.getElementById("bg-video"); bg.src = CONFIG.BG_VIDEO_URL; bg.style.display = "block"; bg.play().catch(() => {}); }
+  fitStage(); window.addEventListener("resize", fitStage);
+  tickClock(); setInterval(tickClock, 1000);
+  pollCelebrations(); setInterval(pollCelebrations, CONFIG.CELEBRATION_POLL_SECONDS * 1000);
+  startRealtime();
+  scheduleDailyReload();
+  loop();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+/* betterhomes font kit — place the font files in /fonts next to this file.
+   Serif (headlines): Ivy Mode · Body: IvyEpic · fallbacks Georgia / Segoe UI */
+
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-Thin.ttf") format("truetype");     font-weight: 200; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-Light.ttf") format("truetype");    font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-Regular.ttf") format("truetype");  font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-SemiBold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-Bold.ttf") format("truetype");     font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-ThinItalic.ttf") format("truetype");     font-weight: 200; font-style: italic; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-LightItalic.ttf") format("truetype");    font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-Italic.ttf") format("truetype");         font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-SemiBoldItalic.ttf") format("truetype"); font-weight: 600; font-style: italic; font-display: swap; }
+@font-face { font-family: "Ivy Mode"; src: url("fonts/IvyMode-BoldItalic.ttf") format("truetype");     font-weight: 700; font-style: italic; font-display: swap; }
+
+@font-face { font-family: "IvyEpic"; src: url("fonts/ivyepic-light.otf") format("opentype");    font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "IvyEpic"; src: url("fonts/ivyepic.otf") format("opentype");          font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "IvyEpic"; src: url("fonts/ivyepic-semibold.otf") format("opentype"); font-weight: 600; font-style: normal; font-display: swap; }
+
+@font-face { font-family: "Ivy Style Sans"; src: url("fonts/IvyStyleSans-Light.otf") format("opentype");    font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ivy Style Sans"; src: url("fonts/IvyStyleSans-SemiBold.otf") format("opentype"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ivy Style Sans"; src: url("fonts/IvyStyleSans-Bold.otf") format("opentype");     font-weight: 700; font-style: normal; font-display: swap; }
+
+:root {
+  --font-serif: "Ivy Mode", Georgia, serif;
+  --font-epic: "IvyEpic", "Segoe UI", sans-serif;
+}
