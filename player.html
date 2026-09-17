@@ -176,8 +176,13 @@ const CONFIG = {
   CELEBRATION_SECONDS: 15,         // how long each celebration plays
   CELEBRATION_GAP_SECONDS: 3,      // breather between back-to-back celebrations
   SCENES: [
+    // deal_type: "Sale" | "Rent" | undefined (all deals)
     { title: "Reservation value", metric: "rank_by_value",      date_field: "reserved", seconds: 60 },
     { title: "Closed deals",      metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
+    { title: "Sales value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
+    { title: "Sales volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
+    { title: "Rentals value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
+    { title: "Rentals volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
   ],
 };
 
@@ -286,13 +291,14 @@ document.getElementById("rows").innerHTML = ROW_TOPS.map((top, i) => {
 /* =====================================================================
    Data
 ===================================================================== */
-const boardCache = {}; // per date_field
+const boardCache = {}; // one entry per scene (date_field + metric + deal_type)
+const sceneKey = (s) => `${s.date_field}|${s.metric}|${s.deal_type || "all"}`;
 
 async function fetchBoard(scene) {
   const [start, end] = periodBounds();
-  const rows = await rpc("leaderboard", { p_start: start, p_end: end, p_date_field: scene.date_field });
+  const rows = await rpc("leaderboard", { p_start: start, p_end: end, p_date_field: scene.date_field, p_deal_type: scene.deal_type || null });
   rows.sort((a, b) => a[scene.metric] - b[scene.metric]);
-  boardCache[scene.date_field + scene.metric] = rows.slice(0, 8);
+  boardCache[sceneKey(scene)] = rows.slice(0, 8);
 }
 
 function valueFor(entry, metric) {
@@ -302,7 +308,7 @@ function valueFor(entry, metric) {
 }
 
 function renderBoard(scene) {
-  const rows = boardCache[scene.date_field + scene.metric] || [];
+  const rows = boardCache[sceneKey(scene)] || [];
   document.getElementById("board-title").textContent = scene.title;
   [1, 2, 3].forEach((rank, idx) => {
     const e = rows[idx];
