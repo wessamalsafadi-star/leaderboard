@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>send a celebration — betterhomes</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  :root {
+    --slate: #1F343F; --denim: #2C537A; --powder: #7BA0B2;
+    --sand: #D9B9A0; --mist: #EDE8E4; --white: #fff;
+    --ok: #3E7C59; --warn: #B4552D;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--mist); color: var(--slate); font-family: var(--font-epic, "Segoe UI", sans-serif); font-size: 15px; }
+  h1, h2 { font-family: var(--font-serif, Georgia, serif); font-weight: 400; margin: 0; }
+  button { font-family: inherit; font-size: 14px; border: none; border-radius: 3px; padding: 9px 16px; cursor: pointer; background: var(--slate); color: var(--white); }
+  button.ghost { background: transparent; color: var(--slate); border: 1px solid var(--slate); }
+  button.small { padding: 5px 10px; font-size: 13px; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  input, select { font-family: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #c9c2ba; border-radius: 3px; background: var(--white); color: var(--slate); width: 100%; }
+  label { display: block; font-size: 12px; color: var(--denim); margin: 12px 0 4px; }
+  header { background: var(--slate); color: var(--white); padding: 18px 28px; display: flex; align-items: baseline; gap: 24px; }
+  header .wordmark { font-family: var(--font-serif, Georgia, serif); font-size: 26px; letter-spacing: 0.5px; }
+  header .sub { font-size: 13px; color: var(--sand); }
+  header .right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 13px; }
+  main { padding: 24px 28px; max-width: 760px; margin: 0 auto; }
+  .card { background: var(--white); border-radius: 4px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(31,52,63,0.08); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 9px 10px; border-bottom: 1px solid #efeae4; vertical-align: middle; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+  .pill.on { background: #e2ede6; color: var(--ok); }
+  .pill.neutral { background: var(--mist); color: var(--denim); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  #cel-comm { max-width: calc(50% - 8px); }
+
+  /* ---------- phones ---------- */
+  @media (max-width: 640px) {
+    .grid2 { grid-template-columns: 1fr; }
+    #cel-comm { max-width: none; }
+    /* 16px inputs stop iOS Safari from auto-zooming the page on focus */
+    input, select { font-size: 16px; padding: 12px; }
+    button { font-size: 16px; padding: 13px 18px; }
+    button.small { font-size: 13px; padding: 6px 10px; }
+    #cel-send { width: 100%; }
+    header { padding: 14px 16px; flex-wrap: wrap; row-gap: 4px; }
+    header .wordmark { font-size: 22px; }
+    main { padding: 16px; }
+    .card { padding: 16px; }
+    #login { margin: 8vh auto; }
+    /* recently-sent table stacks into cards */
+    #recent-rows tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 12px 0; border-bottom: 1px solid #efeae4; }
+    #recent-rows td { display: block; padding: 0; border: none; }
+    #recent-rows td:nth-child(1) { grid-column: 1; grid-row: 1; }
+    #recent-rows td:nth-child(4) { grid-column: 2; grid-row: 1; justify-self: end; }
+    #recent-rows td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; font-size: 14px; }
+    #recent-rows td:nth-child(3) { grid-column: 1; grid-row: 3; font-size: 13px; color: var(--denim); }
+    #recent-rows td:nth-child(5) { grid-column: 2; grid-row: 3; justify-self: end; }
+  }
+  #login { max-width: 380px; margin: 12vh auto; padding: 0 16px; }
+  .muted { color: var(--powder); font-size: 13px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--slate); color: var(--white); padding: 10px 22px; border-radius: 3px; font-size: 14px; display: none; }
+</style>
+</head>
+<body>
+
+<!-- ====================== LOGIN ====================== -->
+<div id="login">
+  <div class="card">
+    <h1 style="font-size:28px;">send a celebration</h1>
+    <p class="muted">betterhomes — plays on the office screens</p>
+    <label>Email</label><input id="login-email" type="email" autocomplete="username">
+    <label>Password</label><input id="login-pass" type="password" autocomplete="current-password">
+    <div style="margin-top:18px;"><button id="login-btn" style="width:100%;">Sign in</button></div>
+    <p id="login-err" style="color:var(--warn); font-size:13px;"></p>
+  </div>
+</div>
+
+<!-- ====================== APP ====================== -->
+<div id="app" style="display:none;">
+  <header>
+    <span class="wordmark">betterhomes</span>
+    <span class="sub">celebrations</span>
+    <div class="right">
+      <span id="who"></span>
+      <button class="ghost small" style="border-color:var(--sand); color:var(--sand);" id="signout">Sign out</button>
+    </div>
+  </header>
+  <main>
+    <div class="card">
+      <h2 style="font-size:22px; margin-bottom:6px;">Send a celebration</h2>
+      <p class="muted" style="margin-top:0;">Plays on all screens within moments, for 15 seconds each.</p>
+      <label>Broker</label><select id="cel-broker"></select>
+      <div class="grid2">
+        <div><label>Headline (e.g. 3 bedrooms in Palm Jumeirah)</label><input id="cel-headline"></div>
+        <div><label>Sale value (AED)</label><input id="cel-value" type="number" min="0"></div>
+      </div>
+      <label>Commission value (AED)</label><input id="cel-comm" type="number" min="0">
+      <div style="margin-top:16px;"><button id="cel-send">Send to screens</button></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:20px; margin-bottom:6px;">Recently sent</h2>
+      <table><tbody id="recent-rows"></tbody></table>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+/* ================= CONFIG — same project as admin.html ================= */
+const SUPABASE_URL = "https://xbjzvtnpbyadolkexsvq.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhianp2dG5wYnlhZG9sa2V4c3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MjMyNjksImV4cCI6MjEwNDQ5OTI2OX0.ieFmzlAuRcNyJdtIo44zj1p0ksyEDMcZ5GsLJxovGJw";
+/* ======================================================================= */
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const toast = (m) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; setTimeout(() => t.style.display = "none", 2600); };
+const fmt = (v) => v == null ? "" : `AED ${Number(v).toLocaleString("en-US")}`;
+
+/* ---------------- auth ---------------- */
+$("login-btn").onclick = async () => {
+  $("login-err").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("login-email").value.trim(), password: $("login-pass").value });
+  if (error) { $("login-err").textContent = error.message; return; }
+  start();
+};
+$("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("login-btn").click(); });
+$("signout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+sb.auth.getSession().then(({ data }) => { if (data.session) start(); });
+
+async function start() {
+  const { data: { user } } = await sb.auth.getUser();
+  $("who").textContent = user.email;
+  $("login").style.display = "none";
+  $("app").style.display = "block";
+  const ok = await loadBrokers();
+  if (ok) loadRecent();
+}
+
+/* ---------------- brokers ---------------- */
+async function loadBrokers() {
+  const { data, error } = await sb.from("brokers")
+    .select("id, full_name, display_name, branch_name, is_broker, left_at")
+    .order("full_name");
+  if (error || !data || !data.length) {
+    // RLS returns an empty set (or an error) when the account has no
+    // manager/admin role — say so plainly instead of showing a dead form.
+    $("app").querySelector("main").innerHTML =
+      `<div class="card"><h2 style="font-size:20px;">No access</h2>
+       <p class="muted">This account isn't set up as a manager yet. Ask the leaderboard admin to add your email, then sign in again.</p></div>`;
+    return false;
+  }
+  $("cel-broker").innerHTML = `<option value="">Select a broker…</option>` +
+    data.filter(b => b.is_broker && !b.left_at)
+      .map(b => `<option value="${b.id}">${b.display_name || b.full_name}${b.branch_name ? " — " + b.branch_name : ""}</option>`)
+      .join("");
+  return true;
+}
+
+/* ---------------- send ---------------- */
+$("cel-send").onclick = async () => {
+  const broker_id = Number($("cel-broker").value);
+  const headline = $("cel-headline").value.trim();
+  if (!broker_id) { toast("Choose a broker"); return; }
+  if (!headline) { toast("Add a headline"); return; }
+  $("cel-send").disabled = true;
+  const { error } = await sb.from("celebration_events").insert({
+    broker_id, headline,
+    sale_value: Number($("cel-value").value) || null,
+    commission_value: Number($("cel-comm").value) || null,
+    state: "approved",
+  });
+  $("cel-send").disabled = false;
+  if (error) { toast(error.message); return; }
+  toast("Sent — screens will play it in a moment");
+  $("cel-headline").value = ""; $("cel-value").value = ""; $("cel-comm").value = ""; $("cel-broker").value = "";
+  loadRecent();
+};
+
+/* ---------------- recent ---------------- */
+async function loadRecent() {
+  const { data, error } = await sb.from("celebration_events")
+    .select("headline, sale_value, state, created_at, brokers(full_name, display_name)")
+    .in("state", ["approved", "played"])
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error || !data) return;
+  $("recent-rows").innerHTML = data.length ? data.map(c => `
+    <tr>
+      <td><strong>${c.brokers ? (c.brokers.display_name || c.brokers.full_name) : ""}</strong></td>
+      <td>${c.headline || ""}</td>
+      <td>${fmt(c.sale_value)}</td>
+      <td><span class="pill ${c.state === "played" ? "on" : "neutral"}">${c.state === "approved" ? "queued" : "played"}</span></td>
+      <td class="muted" style="font-size:12px; white-space:nowrap;">${new Date(c.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
+    </tr>`).join("") : `<tr><td class="muted">Nothing sent yet.</td></tr>`;
+}
+</script>
+</body>
+</html>
