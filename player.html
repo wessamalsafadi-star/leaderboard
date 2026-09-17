@@ -303,7 +303,7 @@ async function fetchBoard(scene) {
 
 function valueFor(entry, metric) {
   if (metric === "rank_by_commission") return fmtValue(entry.total_gross_commission);
-  if (metric === "rank_by_deals") return `${entry.deals} deals`;
+  if (metric === "rank_by_deals") return `${entry.deals} ${Number(entry.deals) === 1 ? "deal" : "deals"}`;
   return fmtValue(entry.total_value);
 }
 
