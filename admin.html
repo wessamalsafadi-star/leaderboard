@@ -413,10 +413,16 @@ $("d-save").onclick = async () => {
 
 /* ---------------- celebrations ---------------- */
 async function loadCelebrations() {
-  const { data, error } = await sb.from("celebration_events")
-    .select("*, brokers(full_name, display_name, branch_name)").order("created_at", { ascending: false }).limit(60);
+  // Two separate queries: with a big pending backlog, a single "latest 60"
+  // fetch fills up with pending rows and the Recent list comes back empty.
+  const sel = "*, brokers(full_name, display_name, branch_name)";
+  const [pendRes, recentRes] = await Promise.all([
+    sb.from("celebration_events").select(sel).eq("state", "pending").order("created_at", { ascending: false }).limit(100),
+    sb.from("celebration_events").select(sel).neq("state", "pending").order("created_at", { ascending: false }).limit(15),
+  ]);
+  const error = pendRes.error || recentRes.error;
   if (error) { toast(error.message); return; }
-  const pending = data.filter(c => c.state === "pending");
+  const pending = pendRes.data || [], recent = recentRes.data || [];
   $("celeb-badge").textContent = pending.length ? `(${pending.length})` : "";
   // keep any half-typed headline if a live update re-renders the table mid-typing
   const drafts = {};
@@ -433,10 +439,11 @@ async function loadCelebrations() {
         <button class="small ghost" onclick="window._skip(${c.id})">Skip</button>
       </td>
     </tr>`).join("") : `<tr><td style="color:var(--powder);">Nothing pending — new closed deals appear here automatically.</td></tr>`;
-  $("celeb-recent").innerHTML = data.filter(c => c.state !== "pending").slice(0, 15).map(c => `
+  $("celeb-recent").innerHTML = recent.length ? recent.map(c => `
     <tr><td>${bname(c)}</td><td>${c.headline || ""}</td><td>${fmt(c.sale_value)}</td>
     <td><span class="pill ${c.state === "played" ? "on" : "neutral"}">${c.state}</span></td>
-    <td style="text-align:right;">${c.state === "approved" ? "" : `<button class="small ghost" onclick="window._replay(${c.id})">Play again</button>`}</td></tr>`).join("");
+    <td style="text-align:right;"><button class="small ghost" onclick="window._replay(${c.id})">Play again</button></td></tr>`).join("")
+    : `<tr><td style="color:var(--powder);">Nothing approved, played or skipped yet.</td></tr>`;
   Object.entries(drafts).forEach(([id, v]) => { const el = $(id); if (el && !el.value.trim()) el.value = v; });
 }
 window._approve = async (id) => {
