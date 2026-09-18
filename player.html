@@ -175,6 +175,8 @@ const CONFIG = {
   CELEBRATION_POLL_SECONDS: 30,    // how often to check the approval queue
   CELEBRATION_SECONDS: 15,         // how long each celebration plays
   CELEBRATION_GAP_SECONDS: 3,      // breather between back-to-back celebrations
+  CELEBRATION_PLAYS: 2,            // each celebration shows this many times in total
+  CELEBRATION_REPLAY_GAP_MINUTES: 30, // wait between the showings
   SCENES: [
     // deal_type: "Sale" | "Rent" | undefined (all deals)
     { title: "Reservation value", metric: "rank_by_value",      date_field: "reserved", seconds: 60 },
@@ -332,13 +334,25 @@ function renderBoard(scene) {
 
 /* =====================================================================
    Celebrations (take-over)
+   Each celebration shows CELEBRATION_PLAYS times in total: the first
+   showing happens as soon as it's approved, and each repeat is scheduled
+   CELEBRATION_REPLAY_GAP_MINUTES later on this screen. The event is marked
+   `played` in the DB after the FIRST showing (so the admin queue behaves
+   exactly as before); the repeats live in this screen's memory.
 ===================================================================== */
-let celebrationQueue = [], celebrating = false;
+let celebrationQueue = [], scheduledReplays = [], celebrating = false;
+
+function promoteDueReplays() {
+  const now = Date.now();
+  for (let i = scheduledReplays.length - 1; i >= 0; i--) {
+    if (scheduledReplays[i]._dueAt <= now) celebrationQueue.push(scheduledReplays.splice(i, 1)[0]);
+  }
+}
 
 async function pollCelebrations() {
   try {
     const pending = await rpc("pending_celebrations") || [];
-    const known = new Set(celebrationQueue.map(c => c.id));
+    const known = new Set([...celebrationQueue, ...scheduledReplays].map(c => c.id));
     pending.forEach(c => { if (!known.has(c.id)) celebrationQueue.push(c); });
   } catch (e) { /* silent; board keeps playing */ }
 }
@@ -353,7 +367,13 @@ async function playCelebration(c) {
   renderPortrait(document.getElementById("c-media"), c, 170);
   showScene("scene-congrats");
   await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_SECONDS * 1000));
-  try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
+  const playsDone = (c._plays || 0) + 1;
+  if (playsDone === 1) {
+    try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
+  }
+  if (playsDone < (CONFIG.CELEBRATION_PLAYS || 1)) {
+    scheduledReplays.push({ ...c, _plays: playsDone, _dueAt: Date.now() + CONFIG.CELEBRATION_REPLAY_GAP_MINUTES * 60000 });
+  }
   celebrating = false;
 }
 
@@ -375,6 +395,7 @@ function showScene(id) {
 async function loop() {
   let i = 0;
   for (;;) {
+    promoteDueReplays();
     // Celebrations take priority over the rotation
     if (celebrationQueue.length) {
       await playCelebration(celebrationQueue.shift());
@@ -388,9 +409,12 @@ async function loop() {
     const scene = CONFIG.SCENES[i % CONFIG.SCENES.length]; i++;
     try { await fetchBoard(scene); renderBoard(scene); setStatus(scene); } catch (e) { setStatus(scene, e); }
     showScene("scene-board");
-    // wait scene.seconds, but wake early if a celebration arrives
+    // wait scene.seconds, but wake early if a celebration arrives or a replay comes due
     const until = Date.now() + scene.seconds * 1000;
-    while (Date.now() < until && !celebrationQueue.length) await new Promise(r => setTimeout(r, 1000));
+    while (Date.now() < until && !celebrationQueue.length) {
+      promoteDueReplays();
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 }
 
