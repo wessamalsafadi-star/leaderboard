@@ -32,6 +32,13 @@
   .media-slot { position: absolute; display: flex; align-items: flex-end; justify-content: center; }
   .media-slot video.alpha { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; }
   .media-slot img.cutout { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; }
+  /* 1st place: the photo's hard bottom crop was visible, so the last ~110px
+     of the cutout fades to transparent (gradient mask) and a soft blur band
+     sits over the seam to melt what's left into the background */
+  #p1-media video.alpha, #p1-media img.cutout {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 110px), rgba(0,0,0,0.55) calc(100% - 55px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 110px), rgba(0,0,0,0.55) calc(100% - 55px), transparent 100%);
+  }
   .portrait-card { width: 68%; aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden;
     background: rgba(255,255,255,0.03); backdrop-filter: blur(8px);
     display: flex; align-items: center; justify-content: center; }
@@ -97,12 +104,14 @@
     <span id="board-title" style="position:absolute; left:0px; top:60px; width:1180px; font-family:var(--font-serif); font-weight:400; font-size:118px; text-align:center; white-space:nowrap; line-height:1; color:var(--bh-white); z-index:1;"></span>
 
     <!-- 1st -->
-    <div class="media-slot" id="p1-media" style="left:-20px; top:55px; width:700px; height:905px; z-index:2;"></div>
+    <div class="media-slot" id="p1-media" style="left:-45px; top:-35px; width:750px; height:970px; z-index:2;"></div>
     <!-- soft halo blending the winner photo into the background (from original design, bleeds off left edge) -->
     <div class="halo" style="left:-140px; top:670px; width:660px; height:350px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <!-- extra blur band across the bottom of the 1st-place portrait (seam cover) -->
+    <div class="halo" style="left:-100px; top:820px; width:860px; height:230px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <!-- podium glow (from original design) -->
     <div style="position:absolute; left:377px; top:600px; transform:matrix(0,1,-1,0,986.048,786.968); transform-origin:0 0; width:350.032px; height:459.896px; border-radius:12px; background:radial-gradient(175.016px 229.948px at 50% 50%, rgba(255,255,255,0) 0%, rgba(0,0,0,0.02) 50%, rgba(255,255,255,0) 100%); backdrop-filter:blur(100px); -webkit-backdrop-filter:blur(100px); pointer-events:none; z-index:4;"></div>
-    <span style="position:absolute; left:434px; top:315px; font-family:var(--font-serif); font-size:172px; line-height:1.2; color:var(--bh-sand); z-index:6;">1<span class="ord">st</span></span>
+    <span style="position:absolute; left:434px; top:281px; font-family:var(--font-serif); font-size:200px; line-height:1.2; color:var(--bh-sand); z-index:6;">1<span class="ord">st</span></span>
     <div class="value-chip" style="position:absolute; left:430px; top:507px; min-width:266px; height:78px; padding:0 24px; z-index:6; display:flex; align-items:center; justify-content:center;">
       <span id="p1-value" style="font-family:var(--font-serif); font-weight:600; font-size:51px; white-space:nowrap; color:var(--bh-white);"></span>
     </div>
@@ -114,7 +123,7 @@
     <!-- 2nd -->
     <div class="media-slot" id="p2-media" style="left:749px; top:136px; width:470px; height:400px; z-index:2;"></div>
     <div class="halo" style="left:710px; top:425px; width:460px; height:210px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <span style="position:absolute; left:722px; top:246px; font-family:var(--font-serif); font-size:118px; line-height:1.2; color:var(--bh-sand); z-index:6;">2<span class="ord">nd</span></span>
+    <span style="position:absolute; left:722px; top:222px; font-family:var(--font-serif); font-size:138px; line-height:1.2; color:var(--bh-sand); z-index:6;">2<span class="ord">nd</span></span>
     <div class="value-chip" style="position:absolute; left:724px; top:372px; min-width:209px; height:61px; padding:0 20px; z-index:6; display:flex; align-items:center; justify-content:center;">
       <span id="p2-value" style="font-family:var(--font-serif); font-weight:600; font-size:41px; white-space:nowrap; color:var(--bh-white);"></span>
     </div>
@@ -124,9 +133,9 @@
     </div>
 
     <!-- 3rd -->
-    <div class="media-slot" id="p3-media" style="left:557px; top:640px; width:469px; height:314px; z-index:2;"></div>
+    <div class="media-slot" id="p3-media" style="left:522px; top:700px; width:540px; height:380px; z-index:2;"></div>
     <div class="halo" style="left:446px; top:913px; width:675px; height:299px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <span style="position:absolute; left:869px; top:729px; font-family:var(--font-serif); font-size:102px; line-height:1.2; color:var(--bh-sand); z-index:6;">3<span class="ord">rd</span></span>
+    <span style="position:absolute; left:869px; top:710px; font-family:var(--font-serif); font-size:118px; line-height:1.2; color:var(--bh-sand); z-index:6;">3<span class="ord">rd</span></span>
     <div class="value-chip" style="position:absolute; left:870px; top:841px; min-width:163px; height:57px; padding:0 18px; z-index:6; display:flex; align-items:center; justify-content:center;">
       <span id="p3-value" style="font-family:var(--font-serif); font-weight:600; font-size:31px; white-space:nowrap; color:var(--bh-white);"></span>
     </div>
@@ -179,12 +188,11 @@ const CONFIG = {
   CELEBRATION_REPLAY_GAP_MINUTES: 30, // wait between the showings
   SCENES: [
     // deal_type: "Sale" | "Rent" | undefined (all deals)
-    { title: "Reservation value", metric: "rank_by_value",      date_field: "reserved", seconds: 60 },
-    { title: "Closed deals",      metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
-    { title: "Sales value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Sales volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Rentals value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
-    { title: "Rentals volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
+    { title: "Top Sales value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
+    { title: "Top Leasing value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
+    { title: "Top Sales volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
+    { title: "Top Leasing volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
+    { title: "Closed deals",   metric: "rank_by_commission", date_field: "closed",   seconds: 45 }, // uncomment to restore
   ],
 };
 
@@ -284,10 +292,7 @@ document.getElementById("rows").innerHTML = ROW_TOPS.map((top, i) => {
     <span id="r${rank}-division" style="position:absolute; top:98px; right:36px; font-family:var(--font-epic); font-size:10px; text-align:right; color:rgba(255,255,255,0.8);"></span>
   </div>
   <span style="position:absolute; left:1248px; top:${top + 2}px; font-family:var(--font-serif); font-size:84px; line-height:1.1; color:var(--bh-sand); z-index:3;">${rank}<span class="ord">th</span></span>
-  <span id="r${rank}-value" style="position:absolute; left:1536px; top:${top + 32}px; width:152px; font-family:var(--font-serif); font-weight:600; font-size:36px; text-align:center; white-space:nowrap; color:var(--bh-white); z-index:3;"></span>
-  <div class="chip" style="position:absolute; left:1248px; top:${top + 96}px; min-width:118px; height:28px; padding:0 10px; z-index:3;">
-    <span id="r${rank}-date" style="font-family:var(--font-epic); font-weight:500; font-size:12px; white-space:nowrap; color:var(--bh-white);"></span>
-  </div>`;
+  <span id="r${rank}-value" style="position:absolute; left:1536px; top:${top + 32}px; width:152px; font-family:var(--font-serif); font-weight:600; font-size:36px; text-align:center; white-space:nowrap; color:var(--bh-white); z-index:3;"></span>`;
 }).join("");
 
 /* =====================================================================
@@ -322,11 +327,10 @@ function renderBoard(scene) {
   for (let i = 0; i < 5; i++) {
     const rank = i + 4, e = rows[3 + i];
     const nameEl = document.getElementById(`r${rank}-name`);
-    if (!e) { nameEl.textContent = ""; ["value", "date", "division"].forEach(k => document.getElementById(`r${rank}-${k}`).textContent = ""); document.getElementById(`r${rank}-media`).innerHTML = ""; continue; }
+    if (!e) { nameEl.textContent = ""; ["value", "division"].forEach(k => document.getElementById(`r${rank}-${k}`).textContent = ""); document.getElementById(`r${rank}-media`).innerHTML = ""; continue; }
     const [f, l] = firstLast(e.name);
     nameEl.innerHTML = l ? `${f}<br>${l}` : f;
     document.getElementById(`r${rank}-value`).textContent = valueFor(e, scene.metric).replace(/^AED\s*/, "");
-    document.getElementById(`r${rank}-date`).textContent = fmtDateShort(e.last_deal_at);
     document.getElementById(`r${rank}-division`).textContent = e.branch_name || "";
     renderTile(document.getElementById(`r${rank}-media`), e);
   }
