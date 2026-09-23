@@ -20,7 +20,7 @@
     display: flex; align-items: center; justify-content: center; }
   /* dark translucent blurred box behind the AED values (podium + rows) */
   .value-chip { border-radius: 4px; background: rgba(0,0,0,0.06);
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(4px); border: .5px solid rgba(255,255,255,0.08); padding: 10px 5px !important; }
   .row-panel { position: absolute; left: 1212px; width: 636px; height: 132px; border-radius: 4px;
     background: rgba(255,255,255,0.02); backdrop-filter: blur(11px); }
   /* ---- portrait rendering -------------------------------------------------
@@ -78,7 +78,7 @@
   .halo i:nth-child(4) { inset: 21%; backdrop-filter: blur(5px);  -webkit-backdrop-filter: blur(5px); }
   .halo i:nth-child(5) { inset: 28%; backdrop-filter: blur(7px);  -webkit-backdrop-filter: blur(7px); }
   .halo i:nth-child(6) { inset: 35%; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-  .halo i:nth-child(7) { inset: 42%; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .halo i:nth-child(7) { inset: 42%; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(30px); }
 </style>
 </head>
 <body>
@@ -112,7 +112,7 @@
     <!-- podium glow (from original design) -->
     <div style="position:absolute; left:377px; top:600px; transform:matrix(0,1,-1,0,986.048,786.968); transform-origin:0 0; width:350.032px; height:459.896px; border-radius:12px; background:radial-gradient(175.016px 229.948px at 50% 50%, rgba(255,255,255,0) 0%, rgba(0,0,0,0.02) 50%, rgba(255,255,255,0) 100%); backdrop-filter:blur(100px); -webkit-backdrop-filter:blur(100px); pointer-events:none; z-index:4;"></div>
     <span style="position:absolute; left:434px; top:281px; font-family:var(--font-serif); font-size:200px; line-height:1.2; color:var(--bh-sand); z-index:6;">1<span class="ord">st</span></span>
-    <div class="value-chip" style="position:absolute; left:430px; top:470px; min-width:266px; height:78px; padding:0 24px; z-index:6; display:flex; align-items:center; justify-content:center;">
+    <div class="value-chip" style="position:absolute; left:430px; top:475px; min-width:266px; height:78px; padding:0 24px; z-index:6; display:flex; align-items:center; justify-content:center;">
       <span id="p1-value" style="font-family:var(--font-serif); font-weight:600; font-size:51px; white-space:nowrap; color:var(--bh-white);"></span>
     </div>
     <div class="name-glow" style="position:absolute; left:20px; top:713px; width:620px; padding:46px 40px; display:flex; flex-direction:column; gap:10px; align-items:center; z-index:6;">
@@ -121,10 +121,10 @@
     </div>
 
     <!-- 2nd -->
-    <div class="media-slot" id="p2-media" style="left:702px; top:100px; width:592px; height:504px; z-index:2;"></div>
-    <div class="halo" style="left:740px; top:470px; width:460px; height:210px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="media-slot" id="p2-media" style="left:702px; top:100px; width:563px; height:479px; z-index:2;"></div>
+    <div class="halo" style="left:790px; top:470px; width:500px; height:210px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <span style="position:absolute; left:722px; top:222px; font-family:var(--font-serif); font-size:138px; line-height:1.2; color:var(--bh-sand); z-index:6;">2<span class="ord">nd</span></span>
-    <div class="value-chip" style="position:absolute; left:724px; top:350px; min-width:209px; height:61px; padding:0 20px; z-index:6; display:flex; align-items:center; justify-content:center;">
+    <div class="value-chip" style="position:absolute; left:724px; top:355px; min-width:209px; height:61px; padding:0 20px; z-index:6; display:flex; align-items:center; justify-content:center;">
       <span id="p2-value" style="font-family:var(--font-serif); font-weight:600; font-size:41px; white-space:nowrap; color:var(--bh-white);"></span>
     </div>
     <div class="name-glow" style="position:absolute; left:768px; top:504px; width:407px; padding:40px; display:flex; flex-direction:column; gap:10px; align-items:center; z-index:6;">
@@ -136,7 +136,7 @@
     <div class="media-slot" id="p3-media" style="left:490px; top:654px; width:605px; height:426px; z-index:2;"></div>
     <div class="halo" style="left:446px; top:913px; width:675px; height:299px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <span style="position:absolute; left:869px; top:710px; font-family:var(--font-serif); font-size:118px; line-height:1.2; color:var(--bh-sand); z-index:6;">3<span class="ord">rd</span></span>
-    <div class="value-chip" style="position:absolute; left:870px; top:820px; min-width:163px; height:57px; padding:0 18px; z-index:6; display:flex; align-items:center; justify-content:center;">
+    <div class="value-chip" style="position:absolute; left:870px; top:825px; min-width:163px; height:57px; padding:0 18px; z-index:6; display:flex; align-items:center; justify-content:center;">
       <span id="p3-value" style="font-family:var(--font-serif); font-weight:600; font-size:31px; white-space:nowrap; color:var(--bh-white);"></span>
     </div>
     <div class="name-glow" style="position:absolute; left:561px; top:919px; width:407px; padding:38px 40px; display:flex; gap:10px; flex-direction:column; align-items:center; z-index:6;">
@@ -193,6 +193,11 @@ const CONFIG = {
     { title: "Top Sales volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
     { title: "Top Leasing volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
     { title: "Closed deals",          metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
+    // activity scenes: source = activity_leaderboard() over activity_facts (CMS activities, ingested daily by n8n)
+    // activity_type: "Viewing" (counts Completed only) | "Offer" (counts all except Rejected/Cancelled)
+    // lead_type: "Sale" | "Rent" | undefined (all)
+    { title: "Most viewings",         metric: "rank_by_activity",   source: "activity", activity_type: "Viewing", seconds: 45 },
+    { title: "Most offers",           metric: "rank_by_activity",   source: "activity", activity_type: "Offer",   seconds: 45 },
   ],
 };
 
@@ -299,16 +304,25 @@ document.getElementById("rows").innerHTML = ROW_TOPS.map((top, i) => {
    Data
 ===================================================================== */
 const boardCache = {}; // one entry per scene (date_field + metric + deal_type)
-const sceneKey = (s) => `${s.date_field}|${s.metric}|${s.deal_type || "all"}`;
+const sceneKey = (s) => s.source === "activity"
+  ? `activity|${s.activity_type}|${s.metric}|${s.lead_type || "all"}`
+  : `${s.date_field}|${s.metric}|${s.deal_type || "all"}`;
 
 async function fetchBoard(scene) {
   const [start, end] = periodBounds();
-  const rows = await rpc("leaderboard", { p_start: start, p_end: end, p_date_field: scene.date_field, p_deal_type: scene.deal_type || null });
+  const rows = scene.source === "activity"
+    ? await rpc("activity_leaderboard", { p_start: start, p_end: end, p_type: scene.activity_type, p_lead_type: scene.lead_type || null })
+    : await rpc("leaderboard",          { p_start: start, p_end: end, p_date_field: scene.date_field, p_deal_type: scene.deal_type || null });
   rows.sort((a, b) => a[scene.metric] - b[scene.metric]);
   boardCache[sceneKey(scene)] = rows.slice(0, 8);
 }
 
-function valueFor(entry, metric) {
+function valueFor(entry, metric, scene) {
+  if (metric === "rank_by_activity") {
+    const n = Number(entry.activity_count);
+    const noun = scene && scene.activity_type === "Offer" ? "offer" : "viewing";
+    return `${n} ${noun}${n === 1 ? "" : "s"}`;
+  }
   if (metric === "rank_by_commission") return fmtValue(entry.total_gross_commission);
   if (metric === "rank_by_deals") return `${entry.deals} ${Number(entry.deals) === 1 ? "deal" : "deals"}`;
   return fmtValue(entry.total_value);
@@ -321,7 +335,7 @@ function renderBoard(scene) {
     const e = rows[idx];
     document.getElementById(`p${rank}-name`).textContent = e ? e.name : "—";
     document.getElementById(`p${rank}-title`).textContent = e ? (e.designation || e.branch_name || "") : "";
-    document.getElementById(`p${rank}-value`).textContent = e ? valueFor(e, scene.metric) : "";
+    document.getElementById(`p${rank}-value`).textContent = e ? valueFor(e, scene.metric, scene) : "";
     renderPortrait(document.getElementById(`p${rank}-media`), e, rank === 1 ? 150 : 100);
   });
   for (let i = 0; i < 5; i++) {
@@ -330,7 +344,7 @@ function renderBoard(scene) {
     if (!e) { nameEl.textContent = ""; ["value", "division"].forEach(k => document.getElementById(`r${rank}-${k}`).textContent = ""); document.getElementById(`r${rank}-media`).innerHTML = ""; continue; }
     const [f, l] = firstLast(e.name);
     nameEl.innerHTML = l ? `${f}<br>${l}` : f;
-    document.getElementById(`r${rank}-value`).textContent = valueFor(e, scene.metric).replace(/^AED\s*/, "");
+    document.getElementById(`r${rank}-value`).textContent = valueFor(e, scene.metric, scene).replace(/^AED\s*/, "");
     document.getElementById(`r${rank}-division`).textContent = e.branch_name || "";
     renderTile(document.getElementById(`r${rank}-media`), e);
   }
