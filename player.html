@@ -188,16 +188,16 @@ const CONFIG = {
   CELEBRATION_REPLAY_GAP_MINUTES: 30, // wait between the showings
   SCENES: [
     // deal_type: "Sale" | "Rent" | undefined (all deals)
-    { title: "Top Sales value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Top Leasing value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
-    { title: "Top Sales volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Top Leasing volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
-    { title: "Closed deals",          metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
+    { title: "Top Sales Value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
+    { title: "Top Leasing Value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
+    { title: "Top Sales Volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
+    { title: "Top Leasing Volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
+    //{ title: "Closed Deals",          metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
     // activity scenes: source = activity_leaderboard() over activity_facts (CMS activities, ingested daily by n8n)
     // activity_type: "Viewing" (counts Completed only) | "Offer" (counts all except Rejected/Cancelled)
     // lead_type: "Sale" | "Rent" | undefined (all)
-    { title: "Most viewings",         metric: "rank_by_activity",   source: "activity", activity_type: "Viewing", seconds: 45 },
-    { title: "Most offers",           metric: "rank_by_activity",   source: "activity", activity_type: "Offer",   seconds: 45 },
+    { title: "Most Viewings",         metric: "rank_by_activity",   source: "activity", activity_type: "Viewing", seconds: 45 },
+    { title: "Most Offers",           metric: "rank_by_activity",   source: "activity", activity_type: "Offer",   seconds: 45 },
   ],
 };
 
