@@ -355,11 +355,27 @@ function renderBoard(scene) {
    Celebrations (take-over)
    Each celebration shows CELEBRATION_PLAYS times in total: the first
    showing happens as soon as it's approved, and each repeat is scheduled
-   CELEBRATION_REPLAY_GAP_MINUTES later on this screen. The event is marked
-   `played` in the DB after the FIRST showing (so the admin queue behaves
-   exactly as before); the repeats live in this screen's memory.
+   CELEBRATION_REPLAY_GAP_MINUTES later on this screen.
+
+   MULTI-SCREEN: every screen decides for itself what it has already shown
+   (a "seen" list kept in this browser's localStorage). The DB `played`
+   state is still set after the first showing so the admin queue looks
+   right, but it is NOT used to decide whether THIS screen plays it —
+   otherwise the first screen to finish would hide the celebration from
+   all the others. This needs pending_celebrations() to return recently
+   approved events regardless of played state (see the SQL note).
 ===================================================================== */
 let celebrationQueue = [], scheduledReplays = [], celebrating = false;
+
+const SEEN_KEY = "bh-celebrations-seen";
+let seen = new Set();
+try { seen = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch (e) {}
+function remember(key) {
+  seen.add(key);
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-300))); } catch (e) {}
+}
+// key on id + approval time so "Play again" (which re-approves) counts as a new showing
+const celebKey = (c) => `${c.id}:${c.approved_at || c.created_at}`;
 
 function promoteDueReplays() {
   const now = Date.now();
@@ -371,8 +387,11 @@ function promoteDueReplays() {
 async function pollCelebrations() {
   try {
     const pending = await rpc("pending_celebrations") || [];
-    const known = new Set([...celebrationQueue, ...scheduledReplays].map(c => c.id));
-    pending.forEach(c => { if (!known.has(c.id)) celebrationQueue.push(c); });
+    const queued = new Set([...celebrationQueue, ...scheduledReplays].map(celebKey));
+    pending.forEach(c => {
+      const k = celebKey(c);
+      if (!seen.has(k) && !queued.has(k)) celebrationQueue.push(c);
+    });
   } catch (e) { /* silent; board keeps playing */ }
 }
 
@@ -388,6 +407,7 @@ async function playCelebration(c) {
   await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_SECONDS * 1000));
   const playsDone = (c._plays || 0) + 1;
   if (playsDone === 1) {
+    remember(celebKey(c));
     try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
   }
   if (playsDone < (CONFIG.CELEBRATION_PLAYS || 1)) {
