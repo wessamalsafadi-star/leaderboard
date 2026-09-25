@@ -160,7 +160,8 @@
       <span style="font-family:var(--font-epic); font-size:24px; text-align:center; color:var(--bh-white);">Commission value</span>
     </div>
     <div class="media-slot" id="c-media" style="left:1009px; top:120px; width:865px; height:800px; z-index:2;"></div>
-    <div class="name-glow" style="position:absolute; left:1035px; top:902px; width:780px; padding:38px 40px; display:flex; flex-direction:column; gap:5px; align-items:center; z-index:6;">
+    <div class="halo" style="left:940px; top:760px; width:1000px; height:320px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="name-glow" style="position:absolute; left:1035px; top:800px; width:780px; padding:60px 40px; display:flex; flex-direction:column; gap:5px; align-items:center; z-index:6;">
       <span id="c-name" style="font-family:var(--font-serif); font-size:58px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
       <span id="c-title" style="font-family:var(--font-epic); font-size:29px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
     </div>
@@ -296,7 +297,7 @@ document.getElementById("rows").innerHTML = ROW_TOPS.map((top, i) => {
     <span id="r${rank}-name" style="position:absolute; top:32px; right:36px; max-width:210px; font-family:var(--font-serif); font-size:22px; text-align:right; line-height:1.15; color:var(--bh-white);"></span>
     <span id="r${rank}-division" style="position:absolute; top:98px; right:36px; font-family:var(--font-epic); font-size:10px; text-align:right; color:rgba(255,255,255,0.8);"></span>
   </div>
-  <span style="position:absolute; left:1248px; top:${top + 66}px; transform:translateY(-50%); font-family:var(--font-serif); font-size:100px; line-height:1.1; color:var(--bh-sand); z-index:3;">${rank}<span class="ord">th</span></span>
+  <span style="position:absolute; left:1248px; top:${top + 66}px; transform:translateY(-50%); font-family:var(--font-serif); font-size:84px; line-height:1.1; color:var(--bh-sand); z-index:3;">${rank}<span class="ord">th</span></span>
   <span id="r${rank}-value" style="position:absolute; left:1536px; top:${top + 66}px; transform:translateY(-50%); width:152px; font-family:var(--font-serif); font-weight:600; font-size:36px; text-align:center; white-space:nowrap; color:var(--bh-white); z-index:3;"></span>`;
 }).join("");
 
