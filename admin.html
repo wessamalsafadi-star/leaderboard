@@ -3,517 +3,502 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>betterhomes — leaderboard</title>
+<title>leaderboard admin — betterhomes</title>
 <link rel="stylesheet" href="fonts.css">
-<script src="https://unpkg.com/@phosphor-icons/web"></script>
 <style>
   :root {
-    --bh-slate-blue: #1F343F; --bh-denim-blue: #2C537A; --bh-powder-blue: #7BA0B2;
-    --bh-sand: #D9B9A0; --bh-mist: #EDE8E4; --bh-white: #FFFFFF;
+    --slate: #1F343F; --denim: #2C537A; --powder: #7BA0B2;
+    --sand: #D9B9A0; --mist: #EDE8E4; --white: #fff;
+    --ok: #3E7C59; --warn: #B4552D;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; overflow: hidden; cursor: none;
-    background: var(--bh-slate-blue) url("assets/bg-hero.jpg") center / cover no-repeat fixed; }
-  .scene { position: absolute; inset: 0; opacity: 0; transition: opacity 900ms ease; pointer-events: none; }
-  .scene.active { opacity: 1; }
-  .chip { border-radius: 2px; background: rgba(0,0,0,0.09); backdrop-filter: blur(3px);
-    display: flex; align-items: center; justify-content: center; }
-  /* dark translucent blurred box behind the AED values (podium + rows) */
-  .value-chip { border-radius: 4px; background: rgba(0,0,0,0.06);
-    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(4px); border: .5px solid rgba(255,255,255,0.08); padding: 10px 5px !important; }
-  .row-panel { position: absolute; left: 1212px; width: 636px; height: 132px; border-radius: 4px;
-    background: rgba(255,255,255,0.02); backdrop-filter: blur(11px); }
-  /* ---- portrait rendering -------------------------------------------------
-     Transparent webms fill their slot freely (like the mockups).
-     Photos / initials render as a designed portrait card anchored to the
-     bottom of the slot — never a full-slot slab.
-     Portraits sit on layer 2: above the scene titles (layer 1), below the
-     halo blend layers (4) and the values/names (6). */
-  .media-slot { position: absolute; display: flex; align-items: flex-end; justify-content: center; }
-  .media-slot video.alpha { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; }
-  .media-slot img.cutout { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; }
-  /* 1st place: the photo's hard bottom crop was visible, so the last ~110px
-     of the cutout fades to transparent (gradient mask) and a soft blur band
-     sits over the seam to melt what's left into the background */
-  #p1-media video.alpha, #p1-media img.cutout {
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 110px), rgba(0,0,0,0.55) calc(100% - 55px), transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 110px), rgba(0,0,0,0.55) calc(100% - 55px), transparent 100%);
-  }
-  .portrait-card { width: 68%; aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden;
-    background: rgba(255,255,255,0.03); backdrop-filter: blur(8px);
-    display: flex; align-items: center; justify-content: center; }
-  .portrait-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
-  .portrait-card .init { font-family: var(--font-serif); color: var(--bh-sand); }
-  .tile { position: relative; overflow: visible; width: 100%; height: 100%; }
-  .tile .dia { position: absolute; left: 12%; right: 12%; top: 12%; bottom: 12%;
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-    background: rgba(125,132,136,0); }
-  .tile img { position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%);
-    height: 92%; max-width: 100%; object-fit: contain; object-position: bottom center; }
-  .tile .init { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-serif); font-size: 48px; color: var(--bh-sand); }
-  /* soft dark glow behind names — now feathered: the tint fades out inside the
-     gradient itself, and the mask steps down through several stops so both the
-     darkening and the blur dissolve gradually instead of ending in a hard oval */
-  .name-glow { background: radial-gradient(60% 65% at 50% 50%,
-      rgba(10,20,26,0.5) 0%, rgba(10,20,26,0.38) 30%, rgba(10,20,26,0.2) 55%,
-      rgba(10,20,26,0.07) 75%, rgba(10,20,26,0) 92%); }
-  /* raised ordinal suffix (1st, 2nd…) */
-  .ord { font-size: 0.48em; vertical-align: super; line-height: 0; }
-  /* stepped halo: backdrop-blur always cuts off hard at its own edge, so
-     we stack seven concentric ovals with tiny blur increments — each ring
-     only adds 1–3px of blur over the previous one, so no single edge is
-     strong enough to see, and the overall effect reads as a smooth fade.
-     Adjust: outer rings = edge softness, inner rings = peak blur,
-     the inset steps = how fast it ramps toward the centre. */
-  .halo { position: absolute; pointer-events: none; z-index: 4;
-    opacity: 0; transition: opacity 600ms ease; }
-  /* halos only fade in once the scene cross-fade has finished, so the
-     stepped rings never show up as ripples mid-transition */
-  .scene.settled .halo { opacity: 1; }
-  .halo i { position: absolute; display: block; border-radius: 50%; }
-  .halo i:nth-child(1) { inset: 0;   backdrop-filter: blur(1px);  -webkit-backdrop-filter: blur(1px); }
-  .halo i:nth-child(2) { inset: 7%;  backdrop-filter: blur(2px);  -webkit-backdrop-filter: blur(2px); }
-  .halo i:nth-child(3) { inset: 14%; backdrop-filter: blur(3px);  -webkit-backdrop-filter: blur(3px); }
-  .halo i:nth-child(4) { inset: 21%; backdrop-filter: blur(5px);  -webkit-backdrop-filter: blur(5px); }
-  .halo i:nth-child(5) { inset: 28%; backdrop-filter: blur(7px);  -webkit-backdrop-filter: blur(7px); }
-  .halo i:nth-child(6) { inset: 35%; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-  .halo i:nth-child(7) { inset: 42%; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(30px); }
+  body { margin: 0; background: var(--mist); color: var(--slate); font-family: var(--font-epic, "Segoe UI", sans-serif); font-size: 15px; }
+  h1, h2, h3 { font-family: var(--font-serif, Georgia, serif); font-weight: 400; margin: 0; }
+  button { font-family: inherit; font-size: 14px; border: none; border-radius: 3px; padding: 9px 16px; cursor: pointer; background: var(--slate); color: var(--white); }
+  button.ghost { background: transparent; color: var(--slate); border: 1px solid var(--slate); }
+  button.small { padding: 5px 10px; font-size: 13px; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  input, select, textarea { font-family: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #c9c2ba; border-radius: 3px; background: var(--white); color: var(--slate); width: 100%; }
+  label { display: block; font-size: 12px; color: var(--denim); margin: 12px 0 4px; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .toggle input { width: auto; }
+  header { background: var(--slate); color: var(--white); padding: 18px 28px; display: flex; align-items: baseline; gap: 24px; }
+  header .wordmark { font-family: var(--font-serif, Georgia, serif); font-size: 26px; letter-spacing: 0.5px; }
+  header .sub { font-size: 13px; color: var(--sand); }
+  header .right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 13px; }
+  nav { background: var(--white); border-bottom: 1px solid #d8d1c9; padding: 0 28px; display: flex; gap: 4px; }
+  nav button { background: none; color: var(--slate); border-radius: 0; padding: 14px 18px; border-bottom: 3px solid transparent; }
+  nav button.active { border-bottom-color: var(--sand); font-weight: 600; }
+  main { padding: 24px 28px; max-width: 1200px; }
+  .card { background: var(--white); border-radius: 4px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(31,52,63,0.08); }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; color: var(--denim); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #e3ddd5; }
+  td { padding: 9px 10px; border-bottom: 1px solid #efeae4; vertical-align: middle; }
+  tr.rowlink { cursor: pointer; } tr.rowlink:hover { background: #f7f3ef; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+  .pill.on { background: #e2ede6; color: var(--ok); }
+  .pill.off { background: #f0e4dd; color: var(--warn); }
+  .pill.neutral { background: var(--mist); color: var(--denim); }
+  .avatar { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: linear-gradient(160deg, var(--denim), var(--slate)); color: var(--sand); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: 15px; }
+  .drawer-back { position: fixed; inset: 0; background: rgba(31,52,63,0.45); display: none; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; max-width: 95vw; background: var(--white); box-shadow: -8px 0 24px rgba(0,0,0,0.2); padding: 26px; overflow-y: auto; display: none; }
+  .drawer h2 { margin-bottom: 2px; }
+  .drawer .muted { color: var(--powder); font-size: 13px; }
+  .mediarow { display: flex; gap: 14px; align-items: center; margin-top: 10px; }
+  .mediarow .preview { width: 84px; height: 84px; border-radius: 6px; object-fit: cover; background: var(--mist); }
+  .statusline { padding: 10px 14px; border-radius: 4px; font-size: 13px; margin-bottom: 16px; }
+  .statusline.ok { background: #e2ede6; color: var(--ok); }
+  .statusline.warn { background: #f6e3d9; color: var(--warn); }
+  #login { max-width: 380px; margin: 12vh auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .searchbar { display: flex; gap: 10px; margin-bottom: 14px; }
+  .searchbar input { max-width: 320px; }
+  .count { color: var(--powder); font-size: 13px; align-self: center; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--slate); color: var(--white); padding: 10px 22px; border-radius: 3px; font-size: 14px; display: none; }
 </style>
 </head>
 <body>
-<div id="viewport" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center;">
-<div id="stage" style="position:relative; width:1920px; height:1080px; overflow:hidden; font-family:var(--font-serif); transform-origin:center center; flex-shrink:0;">
 
-  <!-- Shared background + gradient -->
-  <video id="bg-video" autoplay muted playsinline loop style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none;"></video>
-
-  <!-- Shared date / time chips -->
-  <div class="chip" style="position:absolute; left:1320px; top:52px; width:295px; height:54px; gap:10px; z-index:20;">
-    <i class="ph ph-calendar-blank" style="font-size:22px; color:var(--bh-sand);"></i>
-    <span id="live-date" style="font-family:var(--font-epic); font-size:24px; white-space:nowrap; color:var(--bh-white);"></span>
+<!-- ====================== LOGIN ====================== -->
+<div id="login">
+  <div class="card">
+    <h1 style="font-size:28px;">leaderboard admin</h1>
+    <p class="muted" style="color:var(--powder); font-size:13px;">betterhomes gamification</p>
+    <label>Email</label><input id="login-email" type="email" autocomplete="username">
+    <label>Password</label><input id="login-pass" type="password" autocomplete="current-password">
+    <div style="margin-top:18px;"><button id="login-btn" style="width:100%;">Sign in</button></div>
+    <p id="login-err" style="color:var(--warn); font-size:13px;"></p>
   </div>
-  <div class="chip" style="position:absolute; left:1628px; top:52px; width:220px; height:54px; gap:10px; z-index:20;">
-    <i class="ph ph-clock" style="font-size:22px; color:var(--bh-sand);"></i>
-    <span id="live-time" style="font-family:var(--font-epic); font-size:24px; white-space:nowrap; color:var(--bh-white);"></span>
-  </div>
-
-  <!-- ==================== SCENE: LEADERBOARD ==================== -->
-  <div class="scene" id="scene-board">
-    <!-- title sits on the lowest layer so the winner portraits overlap it -->
-    <span id="board-title" style="position:absolute; left:0px; top:60px; width:1180px; font-family:var(--font-serif); font-weight:400; font-size:118px; text-align:center; white-space:nowrap; line-height:1; color:var(--bh-white); z-index:1;"></span>
-
-    <!-- 1st -->
-    <div class="media-slot" id="p1-media" style="left:-74px; top:-100px; width:770px; height:995px; z-index:2;"></div>
-    <!-- soft halo blending the winner photo into the background (from original design, bleeds off left edge) -->
-    <div class="halo" style="left:-140px; top:670px; width:660px; height:350px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <!-- extra blur band across the bottom of the 1st-place portrait (seam cover) -->
-    <div class="halo" style="left:-100px; top:820px; width:860px; height:230px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <!-- podium glow (from original design) -->
-    <div style="position:absolute; left:377px; top:600px; transform:matrix(0,1,-1,0,986.048,786.968); transform-origin:0 0; width:350.032px; height:459.896px; border-radius:12px; background:radial-gradient(175.016px 229.948px at 50% 50%, rgba(255,255,255,0) 0%, rgba(0,0,0,0.02) 50%, rgba(255,255,255,0) 100%); backdrop-filter:blur(100px); -webkit-backdrop-filter:blur(100px); pointer-events:none; z-index:4;"></div>
-    <span style="position:absolute; left:434px; top:281px; font-family:var(--font-serif); font-size:200px; line-height:1.2; color:var(--bh-sand); z-index:6;">1<span class="ord">st</span></span>
-    <div class="value-chip" style="position:absolute; left:430px; top:468px; min-width:266px; height:78px; padding:0 24px; z-index:6; display:flex; align-items:center; justify-content:center;">
-      <span id="p1-value" style="font-family:var(--font-serif); font-weight:600; font-size:51px; white-space:nowrap; color:var(--bh-white);"></span>
-    </div>
-    <div class="name-glow" style="position:absolute; left:20px; top:713px; width:620px; padding:46px 40px; display:flex; flex-direction:column; gap:10px; align-items:center; z-index:6;">
-      <span id="p1-name" style="font-family:var(--font-serif); font-size:51px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
-      <span id="p1-title" style="font-family:var(--font-epic); font-size:21px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
-    </div>
-
-    <!-- 2nd -->
-    <div class="media-slot" id="p2-media" style="left:702px; top:100px; width:563px; height:479px; z-index:2;"></div>
-    <div class="halo" style="left:790px; top:470px; width:500px; height:210px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <span style="position:absolute; left:722px; top:222px; font-family:var(--font-serif); font-size:138px; line-height:1.2; color:var(--bh-sand); z-index:6;">2<span class="ord">nd</span></span>
-    <div class="value-chip" style="position:absolute; left:724px; top:348px; min-width:209px; height:61px; padding:0 20px; z-index:6; display:flex; align-items:center; justify-content:center;">
-      <span id="p2-value" style="font-family:var(--font-serif); font-weight:600; font-size:41px; white-space:nowrap; color:var(--bh-white);"></span>
-    </div>
-    <div class="name-glow" style="position:absolute; left:768px; top:504px; width:407px; padding:40px; display:flex; flex-direction:column; gap:10px; align-items:center; z-index:6;">
-      <span id="p2-name" style="font-family:var(--font-serif); font-size:44px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
-      <span id="p2-title" style="font-family:var(--font-epic); font-size:18px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
-    </div>
-
-    <!-- 3rd -->
-    <div class="media-slot" id="p3-media" style="left:490px; top:654px; width:605px; height:426px; z-index:2;"></div>
-    <div class="halo" style="left:446px; top:913px; width:675px; height:299px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <span style="position:absolute; left:869px; top:710px; font-family:var(--font-serif); font-size:118px; line-height:1.2; color:var(--bh-sand); z-index:6;">3<span class="ord">rd</span></span>
-    <div class="value-chip" style="position:absolute; left:870px; top:818px; min-width:163px; height:57px; padding:0 18px; z-index:6; display:flex; align-items:center; justify-content:center;">
-      <span id="p3-value" style="font-family:var(--font-serif); font-weight:600; font-size:31px; white-space:nowrap; color:var(--bh-white);"></span>
-    </div>
-    <div class="name-glow" style="position:absolute; left:561px; top:919px; width:407px; padding:38px 40px; display:flex; gap:10px; flex-direction:column; align-items:center; z-index:6;">
-      <span id="p3-name" style="font-family:var(--font-serif); font-size:40px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
-      <span id="p3-title" style="font-family:var(--font-epic); font-size:18px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
-    </div>
-
-    <div style="position:absolute; left:0; top:0; transform:matrix(0,-1,1,0,1195,137); transform-origin:0 0; width:137px; height:663px; background:linear-gradient(90deg, rgba(29,49,59,0) 0%, rgb(29,49,59) 100%); pointer-events:none;"></div>
-    <div id="rows"></div>
-  </div>
-
-  <!-- ==================== SCENE: CONGRATULATIONS ==================== -->
-  <div class="scene" id="scene-congrats">
-    <!-- headline sits on the lowest layer so the celebrated agent's portrait overlaps it -->
-    <span style="position:absolute; left:18px; top:47px; width:1878px; font-family:var(--font-serif); font-size:225px; text-align:center; white-space:nowrap; line-height:1; color:var(--bh-white); z-index:1;">Congratulations</span>
-    <div style="position:absolute; left:45px; top:500px; width:924px; display:flex; flex-direction:column; align-items:center; gap:6px; z-index:3;">
-      <span id="c-headline" style="font-family:var(--font-epic); font-size:27px; text-align:center; color:var(--bh-white);"></span>
-      <span id="c-value" style="font-family:var(--font-serif); font-weight:600; font-size:120px; text-align:center; white-space:nowrap; line-height:1.35; color:var(--bh-sand);"></span>
-      <span style="font-family:var(--font-epic); font-size:40px; text-align:center; color:var(--bh-white);">Sale value</span>
-      <span id="c-commission" style="font-family:var(--font-epic); font-size:70px; text-align:center; line-height:1.2; color:var(--bh-white); margin-top:56px;"></span>
-      <span style="font-family:var(--font-epic); font-size:24px; text-align:center; color:var(--bh-white);">Commission value</span>
-    </div>
-    <div class="media-slot" id="c-media" style="left:960px; top:40px; width:960px; height:1040px; z-index:2;"></div>
-    <div class="halo" style="left:940px; top:760px; width:1000px; height:320px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="name-glow" style="position:absolute; left:1035px; top:800px; width:780px; padding:60px 40px; display:flex; flex-direction:column; gap:5px; align-items:center; z-index:6;">
-      <span id="c-name" style="font-family:var(--font-serif); font-size:58px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
-      <span id="c-title" style="font-family:var(--font-epic); font-size:29px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
-    </div>
-  </div>
-
-  <span id="status" style="position:absolute; left:16px; bottom:10px; font-family:var(--font-epic); font-size:12px; color:rgba(255,255,255,0.3); z-index:30;"></span>
-</div>
 </div>
 
-<script>
-/* =====================================================================
-   CONFIG
-===================================================================== */
-const CONFIG = {
-  SUPABASE_URL: "https://xbjzvtnpbyadolkexsvq.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhianp2dG5wYnlhZG9sa2V4c3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MjMyNjksImV4cCI6MjEwNDQ5OTI2OX0.ieFmzlAuRcNyJdtIo44zj1p0ksyEDMcZ5GsLJxovGJw",
-  TIMEZONE_OFFSET_HOURS: 4,        // Asia/Dubai — used for month boundaries
-  STORAGE_BUCKET: "media",
-  BG_VIDEO_URL: null,              // optional looping hero webm
-  REFRESH_MINUTES: 5,              // re-fetch board data
-  CELEBRATION_POLL_SECONDS: 30,    // how often to check the approval queue
-  CELEBRATION_SECONDS: 15,         // how long each celebration plays
-  CELEBRATION_GAP_SECONDS: 3,      // breather between back-to-back celebrations
-  CELEBRATION_PLAYS: 2,            // each celebration shows this many times in total
-  CELEBRATION_REPLAY_GAP_MINUTES: 30, // wait between the showings
-  SCENES: [
-    // deal_type: "Sale" | "Rent" | undefined (all deals)
-    { title: "Top Sales Value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Top Leasing Value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
-    { title: "Top Sales Volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Top Leasing Volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
-    //{ title: "Closed Deals",          metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
-    // activity scenes: source = activity_leaderboard() over activity_facts (CMS activities, ingested daily by n8n)
-    // activity_type: "Viewing" (counts Completed only) | "Offer" (counts all except Rejected/Cancelled)
-    // lead_type: "Sale" | "Rent" | undefined (all)
-    { title: "Most Viewings",         metric: "rank_by_activity",   source: "activity", activity_type: "Viewing", seconds: 45 },
-    { title: "Most Offers",           metric: "rank_by_activity",   source: "activity", activity_type: "Offer",   seconds: 45 },
-  ],
-};
+<!-- ====================== APP ====================== -->
+<div id="app" style="display:none;">
+  <header>
+    <span class="wordmark">betterhomes</span>
+    <span class="sub">leaderboard admin</span>
+    <div class="right">
+      <span id="pipeline-pill" class="pill neutral">pipeline: checking…</span>
+      <span id="who"></span>
+      <button class="ghost small" style="border-color:var(--sand); color:var(--sand);" id="signout">Sign out</button>
+    </div>
+  </header>
+  <nav>
+    <button data-tab="brokers" class="active">Brokers</button>
+    <button data-tab="celebrations">Celebrations <span id="celeb-badge"></span></button>
+    <button data-tab="pipeline">Pipeline</button>
+  </nav>
+  <main>
+    <!-- Brokers tab -->
+    <section id="tab-brokers">
+      <div class="searchbar">
+        <input id="broker-search" placeholder="Search name, branch, designation…">
+        <select id="broker-filter" style="max-width:220px;">
+          <option value="board">On leaderboard</option>
+          <option value="brokers">All brokers</option>
+          <option value="all" selected>Everyone</option>
+        </select>
+        <span class="count" id="broker-count"></span>
+        <button class="ghost" id="new-broker" style="margin-left:auto;">Add broker</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead><tr><th></th><th>Name</th><th>Designation</th><th>Branch</th><th>Media</th><th>On board</th></tr></thead>
+          <tbody id="broker-rows"></tbody>
+        </table>
+      </div>
+    </section>
 
-/* =====================================================================
-   Helpers
-===================================================================== */
-const sbHeaders = { "apikey": CONFIG.SUPABASE_ANON_KEY, "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`, "Content-Type": "application/json" };
-const rpc = async (fn, body = {}) => {
-  const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/rpc/${fn}`, { method: "POST", headers: sbHeaders, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`${fn} ${res.status}: ${await res.text()}`);
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
-};
+    <!-- Celebrations tab -->
+    <section id="tab-celebrations" style="display:none;">
+      <div class="card">
+        <h2 style="font-size:22px; margin-bottom:6px;">Send a celebration</h2>
+        <p style="font-size:13px; color:var(--powder); margin-top:0;">Plays on all screens within moments, for 15 seconds each.</p>
+        <div class="grid2">
+          <div><label>Broker</label><select id="cel-broker"></select></div>
+          <div><label>Headline (e.g. 3 bedrooms in Palm Jumeirah)</label><input id="cel-headline"></div>
+          <div><label>Sale value (AED)</label><input id="cel-value" type="number" min="0"></div>
+          <div><label>Commission value (AED)</label><input id="cel-comm" type="number" min="0"></div>
+        </div>
+        <div style="margin-top:16px;"><button id="cel-send">Send to screens</button></div>
+      </div>
+      <div class="card">
+        <h2 style="font-size:22px; margin-bottom:6px;">Pending approval</h2>
+        <p style="font-size:13px; color:var(--powder); margin-top:0;">Approved celebrations play on the office screens. Add a headline before approving — e.g. “3 bedrooms in Palm Jumeirah”.</p>
+        <table><tbody id="celeb-pending"></tbody></table>
+      </div>
+      <div class="card">
+        <h2 style="font-size:20px;">Recent (approved / played / skipped)</h2>
+        <table><tbody id="celeb-recent"></tbody></table>
+      </div>
+    </section>
 
-/* Month boundaries in DUBAI time, not UTC (the Aug-31 bug fix) */
-function periodBounds() {
-  const nowDubai = new Date(Date.now() + CONFIG.TIMEZONE_OFFSET_HOURS * 3600000);
-  const y = nowDubai.getUTCFullYear(), m = nowDubai.getUTCMonth();
-  const pad = (n) => String(n + 1).padStart(2, "0");
-  const start = `${y}-${pad(m)}-01`;
-  const end = m === 11 ? `${y + 1}-01-01` : `${y}-${pad(m + 1)}-01`;
-  // shift boundaries so "month" means Dubai-midnight to Dubai-midnight
-  const tz = `T00:00:00+04:00`;
-  return [start + tz, end + tz, start];
-}
+    <!-- Pipeline tab -->
+    <section id="tab-pipeline" style="display:none;">
+      <div id="pipeline-status"></div>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead><tr><th>Run date</th><th>Source</th><th>Received</th><th>Upserted</th><th>Status</th><th>Error</th><th>Finished</th></tr></thead>
+          <tbody id="run-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
 
-const mediaUrl = (p) => !p ? null : (/^https?:\/\//.test(p) ? p : `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${p}`);
-const initials = (n) => (n || "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
-const firstLast = (n) => { const p = (n || "").trim().split(/\s+/); return p.length <= 1 ? [n || "", ""] : [p[0], p.slice(1).join(" ")]; };
+<!-- ====================== BROKER DRAWER ====================== -->
+<div class="drawer-back" id="drawer-back"></div>
+<div class="drawer" id="drawer">
+  <h2 id="d-name" style="font-size:26px;"></h2>
+  <p class="muted" id="d-meta"></p>
 
-function fmtValue(v) {
-  const n = Number(v) || 0;
-  if (n >= 1_000_000) { const m = n / 1_000_000; return `AED ${m >= 100 ? m.toFixed(0) : m.toFixed(1).replace(/\.0$/, "")}M`; }
-  if (n >= 1_000) return `AED ${Math.round(n / 1000)}K`;
-  return `AED ${n.toLocaleString("en-US")}`;
-}
-const fmtDateShort = (iso) => !iso ? "" : new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-
-/* Portrait renderers:
-   - transparent webm -> fills the slot, bottom-anchored (mockup behaviour)
-   - photo -> designed portrait card
-   - nothing -> portrait card with initials */
-function renderPortrait(slot, entry, initialsPx) {
-  slot.innerHTML = "";
-  const url = mediaUrl(entry?.media_url);
-  if (url && entry.media_type === "webm") {
-    const v = document.createElement("video");
-    v.className = "alpha"; v.src = url; v.autoplay = true; v.muted = true; v.playsInline = true; v.loop = true;
-    v.onerror = () => renderPortrait(slot, { ...entry, media_type: "photo", media_url: entry.photo_url || null }, initialsPx);
-    slot.appendChild(v); v.play().catch(() => {});
-    return;
-  }
-  if (url && entry.media_type === "photo") {
-    // cutout portrait fills the slot exactly like the mockup webms
-    const img = document.createElement("img");
-    img.className = "cutout"; img.src = url; img.alt = entry?.name || "";
-    img.onerror = () => {
-      slot.innerHTML = `<div class="portrait-card"><span class="init" style="font-size:${initialsPx}px;">${initials(entry?.name)}</span></div>`;
-    };
-    slot.appendChild(img);
-    return;
-  }
-  slot.innerHTML = `<div class="portrait-card"><span class="init" style="font-size:${initialsPx}px;">${initials(entry?.name)}</span></div>`;
-}
-
-function renderTile(slot, entry) {
-  slot.innerHTML = "";
-  const t = document.createElement("div");
-  t.className = "tile";
-  const dia = document.createElement("div");
-  dia.className = "dia";
-  t.appendChild(dia);
-  const url = mediaUrl(entry?.row_photo_url);
-  if (url) {
-    const img = document.createElement("img");
-    img.src = url;
-    img.onerror = () => { img.remove(); const s = document.createElement("span"); s.className = "init"; s.textContent = initials(entry?.name); t.appendChild(s); };
-    t.appendChild(img);
-  } else {
-    const s = document.createElement("span");
-    s.className = "init"; s.textContent = initials(entry?.name);
-    t.appendChild(s);
-  }
-  slot.appendChild(t);
-}
-
-/* =====================================================================
-   Board rows 4th–8th
-===================================================================== */
-const ROW_TOPS = [166, 344, 522, 700, 877], PHOTO_TOPS = [119, 296, 474, 653, 831];
-document.getElementById("rows").innerHTML = ROW_TOPS.map((top, i) => {
-  const rank = i + 4, pTop = PHOTO_TOPS[i];
-  return `
-  <div class="media-slot" id="r${rank}-media" style="left:1342px; top:${pTop}px; width:196px; height:197px; z-index:2;"></div>
-  <div class="row-panel" style="top:${top}px;">
-    <span id="r${rank}-name" style="position:absolute; top:32px; right:36px; max-width:210px; font-family:var(--font-serif); font-size:22px; text-align:right; line-height:1.15; color:var(--bh-white);"></span>
-    <span id="r${rank}-division" style="position:absolute; top:98px; right:36px; font-family:var(--font-epic); font-size:10px; text-align:right; color:rgba(255,255,255,0.8);"></span>
+  <div class="grid2">
+    <div><label>Display name (screens)</label><input id="d-display"></div>
+    <div><label>Designation</label><input id="d-desig"></div>
+    <div><label>Branch</label><input id="d-branch"></div>
+    <div><label>Division</label><input id="d-division"></div>
   </div>
-  <span style="position:absolute; left:1248px; top:${top + 66}px; transform:translateY(-50%); font-family:var(--font-serif); font-size:84px; line-height:1.1; color:var(--bh-sand); z-index:3;">${rank}<span class="ord">th</span></span>
-  <span id="r${rank}-value" style="position:absolute; left:1536px; top:${top + 66}px; transform:translateY(-50%); width:152px; font-family:var(--font-serif); font-weight:600; font-size:36px; text-align:center; white-space:nowrap; color:var(--bh-white); z-index:3;"></span>`;
-}).join("");
+  <label>Notes</label><textarea id="d-notes" rows="2"></textarea>
+  <div style="margin-top:14px; display:flex; gap:22px;">
+    <label class="toggle" style="margin:0;"><input type="checkbox" id="d-isbroker"> Is a broker</label>
+    <label class="toggle" style="margin:0;"><input type="checkbox" id="d-onboard"> Show on leaderboard</label>
+  </div>
+  <div style="margin-top:8px;"><label>Left the company (leave empty if active)</label><input id="d-left" type="date" style="max-width:200px;"></div>
 
-/* =====================================================================
-   Data
-===================================================================== */
-const boardCache = {}; // one entry per scene (date_field + metric + deal_type)
-const sceneKey = (s) => s.source === "activity"
-  ? `activity|${s.activity_type}|${s.metric}|${s.lead_type || "all"}`
-  : `${s.date_field}|${s.metric}|${s.deal_type || "all"}`;
+  <h3 style="font-size:19px; margin-top:26px;">Media</h3>
+  <p class="muted" style="margin:4px 0 0;">Screens use the webm when ready, otherwise the photo, otherwise initials.</p>
+  <div class="mediarow">
+    <img class="preview" id="d-photo-prev" alt="">
+    <div style="flex:1;">
+      <label style="margin-top:0;">Podium photo (cutout PNG — shown in ranks 1–3 when no video)</label>
+      <input type="file" id="d-photo-file" accept="image/*">
+    </div>
+  </div>
+  <div class="mediarow">
+    <img class="preview" id="d-row-prev" alt="">
+    <div style="flex:1;">
+      <label style="margin-top:0;">Row photo (headshot — shown in the side list, ranks 4+)</label>
+      <input type="file" id="d-row-file" accept="image/*">
+    </div>
+  </div>
+  <div class="mediarow">
+    <video class="preview" id="d-webm-prev" muted loop autoplay playsinline></video>
+    <div style="flex:1;">
+      <label style="margin-top:0;">Portrait video (.webm, transparent)</label>
+      <input type="file" id="d-webm-file" accept="video/webm">
+      <label>Video status (when no file yet)</label>
+      <select id="d-webm-status" style="max-width:220px;">
+        <option value="missing">missing</option>
+        <option value="in_production">in production</option>
+      </select>
+    </div>
+  </div>
 
-async function fetchBoard(scene) {
-  const [start, end] = periodBounds();
-  const rows = scene.source === "activity"
-    ? await rpc("activity_leaderboard", { p_start: start, p_end: end, p_type: scene.activity_type, p_lead_type: scene.lead_type || null })
-    : await rpc("leaderboard",          { p_start: start, p_end: end, p_date_field: scene.date_field, p_deal_type: scene.deal_type || null });
-  rows.sort((a, b) => a[scene.metric] - b[scene.metric]);
-  boardCache[sceneKey(scene)] = rows.slice(0, 8);
-}
+  <div style="margin-top:26px; display:flex; gap:10px;">
+    <button id="d-save">Save changes</button>
+    <button class="ghost" id="d-close">Close</button>
+  </div>
+  <p id="d-msg" style="font-size:13px; color:var(--denim);"></p>
+</div>
 
-function valueFor(entry, metric, scene) {
-  if (metric === "rank_by_activity") {
-    const n = Number(entry.activity_count);
-    const noun = scene && scene.activity_type === "Offer" ? "offer" : "viewing";
-    return `${n} ${noun}${n === 1 ? "" : "s"}`;
-  }
-  if (metric === "rank_by_commission") return fmtValue(entry.total_gross_commission);
-  if (metric === "rank_by_deals") return `${entry.deals} ${Number(entry.deals) === 1 ? "deal" : "deals"}`;
-  return fmtValue(entry.total_value);
-}
+<div class="toast" id="toast"></div>
 
-function renderBoard(scene) {
-  const rows = boardCache[sceneKey(scene)] || [];
-  document.getElementById("board-title").textContent = scene.title;
-  [1, 2, 3].forEach((rank, idx) => {
-    const e = rows[idx];
-    document.getElementById(`p${rank}-name`).textContent = e ? e.name : "—";
-    document.getElementById(`p${rank}-title`).textContent = e ? (e.designation || e.branch_name || "") : "";
-    document.getElementById(`p${rank}-value`).textContent = e ? valueFor(e, scene.metric, scene) : "";
-    renderPortrait(document.getElementById(`p${rank}-media`), e, rank === 1 ? 150 : 100);
-  });
-  for (let i = 0; i < 5; i++) {
-    const rank = i + 4, e = rows[3 + i];
-    const nameEl = document.getElementById(`r${rank}-name`);
-    if (!e) { nameEl.textContent = ""; ["value", "division"].forEach(k => document.getElementById(`r${rank}-${k}`).textContent = ""); document.getElementById(`r${rank}-media`).innerHTML = ""; continue; }
-    const [f, l] = firstLast(e.name);
-    nameEl.innerHTML = l ? `${f}<br>${l}` : f;
-    document.getElementById(`r${rank}-value`).textContent = valueFor(e, scene.metric, scene).replace(/^AED\s*/, "");
-    document.getElementById(`r${rank}-division`).textContent = e.branch_name || "";
-    renderTile(document.getElementById(`r${rank}-media`), e);
-  }
-}
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-/* =====================================================================
-   Celebrations (take-over)
-   Each celebration shows CELEBRATION_PLAYS times in total: the first
-   showing happens as soon as it's approved, and each repeat is scheduled
-   CELEBRATION_REPLAY_GAP_MINUTES later on this screen.
+/* ================= CONFIG — edit these two lines ================= */
+const SUPABASE_URL = "https://xbjzvtnpbyadolkexsvq.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhianp2dG5wYnlhZG9sa2V4c3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MjMyNjksImV4cCI6MjEwNDQ5OTI2OX0.ieFmzlAuRcNyJdtIo44zj1p0ksyEDMcZ5GsLJxovGJw";
+/* ================================================================= */
 
-   MULTI-SCREEN: every screen decides for itself what it has already shown
-   (a "seen" list kept in this browser's localStorage). The DB `played`
-   state is still set after the first showing so the admin queue looks
-   right, but it is NOT used to decide whether THIS screen plays it —
-   otherwise the first screen to finish would hide the celebration from
-   all the others. This needs pending_celebrations() to return recently
-   approved events regardless of played state (see the SQL note).
-===================================================================== */
-let celebrationQueue = [], scheduledReplays = [], celebrating = false;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const toast = (m) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; setTimeout(() => t.style.display = "none", 2600); };
+const mediaPublicUrl = (p) => p ? (p.startsWith("http") ? p : `${SUPABASE_URL}/storage/v1/object/public/media/${p}`) : null;
 
-const SEEN_KEY = "bh-celebrations-seen";
-let seen = new Set();
-try { seen = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch (e) {}
-function remember(key) {
-  seen.add(key);
-  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-300))); } catch (e) {}
-}
-// key on id + approval time so "Play again" (which re-approves) counts as a new showing
-const celebKey = (c) => `${c.id}:${c.approved_at || c.created_at}`;
+let brokers = [], mediaByBroker = {}, current = null;
 
-function promoteDueReplays() {
-  const now = Date.now();
-  for (let i = scheduledReplays.length - 1; i >= 0; i--) {
-    if (scheduledReplays[i]._dueAt <= now) celebrationQueue.push(scheduledReplays.splice(i, 1)[0]);
-  }
-}
+/* ---------------- auth ---------------- */
+$("login-btn").onclick = async () => {
+  $("login-err").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("login-email").value.trim(), password: $("login-pass").value });
+  if (error) { $("login-err").textContent = error.message; return; }
+  start();
+};
+$("signout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
-async function pollCelebrations() {
-  try {
-    const pending = await rpc("pending_celebrations") || [];
-    const queued = new Set([...celebrationQueue, ...scheduledReplays].map(celebKey));
-    pending.forEach(c => {
-      const k = celebKey(c);
-      if (!seen.has(k) && !queued.has(k)) celebrationQueue.push(c);
-    });
-  } catch (e) { /* silent; board keeps playing */ }
-}
+sb.auth.getSession().then(({ data }) => { if (data.session) start(); });
 
-async function playCelebration(c) {
-  celebrating = true;
-  document.getElementById("c-headline").textContent = c.headline || "";
-  document.getElementById("c-value").textContent = fmtValue(c.sale_value);
-  document.getElementById("c-commission").textContent = fmtValue(c.commission_value);
-  document.getElementById("c-name").textContent = c.name || "";
-  document.getElementById("c-title").textContent = c.designation || "";
-  renderPortrait(document.getElementById("c-media"), c, 170);
-  showScene("scene-congrats");
-  await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_SECONDS * 1000));
-  const playsDone = (c._plays || 0) + 1;
-  if (playsDone === 1) {
-    remember(celebKey(c));
-    try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
-  }
-  if (playsDone < (CONFIG.CELEBRATION_PLAYS || 1)) {
-    scheduledReplays.push({ ...c, _plays: playsDone, _dueAt: Date.now() + CONFIG.CELEBRATION_REPLAY_GAP_MINUTES * 60000 });
-  }
-  celebrating = false;
-}
-
-/* =====================================================================
-   Scene loop
-===================================================================== */
-function showScene(id) {
-  document.querySelectorAll(".scene").forEach(s => {
-    s.classList.toggle("active", s.id === id);
-    s.classList.remove("settled");
-  });
-  clearTimeout(showScene._t);
-  if (id) showScene._t = setTimeout(() => {
-    const s = document.getElementById(id);
-    if (s && s.classList.contains("active")) s.classList.add("settled");
-  }, 950); // just past the 900ms scene fade
-}
-
-async function loop() {
-  let i = 0;
-  for (;;) {
-    promoteDueReplays();
-    // Celebrations take priority over the rotation
-    if (celebrationQueue.length) {
-      await playCelebration(celebrationQueue.shift());
-      if (celebrationQueue.length) {
-        // more queued: fade to the background for a beat so each one lands as its own moment
-        showScene("");
-        await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_GAP_SECONDS * 1000));
-      }
-      continue;
-    }
-    const scene = CONFIG.SCENES[i % CONFIG.SCENES.length]; i++;
-    try { await fetchBoard(scene); renderBoard(scene); setStatus(scene); } catch (e) { setStatus(scene, e); }
-    showScene("scene-board");
-    // wait scene.seconds, but wake early if a celebration arrives or a replay comes due
-    const until = Date.now() + scene.seconds * 1000;
-    while (Date.now() < until && !celebrationQueue.length) {
-      promoteDueReplays();
-      await new Promise(r => setTimeout(r, 1000));
-    }
-  }
-}
-
-function setStatus(scene, err) {
-  const [, , label] = periodBounds();
-  document.getElementById("status").textContent = err
-    ? `Refresh failed — showing last known board · ${err.message}`
-    : `${scene.title} · period from ${label} · updated ${new Date().toLocaleTimeString("en-GB")}`;
-}
-
-/* =====================================================================
-   Clock, scale, boot
-===================================================================== */
-function tickClock() {
-  const now = new Date();
-  document.getElementById("live-date").textContent = now.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-  let h = now.getHours(); const ampm = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
-  document.getElementById("live-time").textContent = `${h} : ${String(now.getMinutes()).padStart(2, "0")} : ${String(now.getSeconds()).padStart(2, "0")} ${ampm}`;
-}
-function fitStage() {
-  const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-  document.getElementById("stage").style.transform = `scale(${s > 0 ? s : 1})`;
-}
-
-/* =====================================================================
-   Realtime + housekeeping
-   - Supabase Realtime pushes celebration changes instantly; the 30s poll
-     below stays on as a safety net, so a CDN or websocket failure can
-     never take the player down. Loaded dynamically for the same reason.
-   - Requires celebration_events in the `supabase_realtime` publication
-     and a SELECT policy for the anon role (see supabase-realtime-setup.sql).
-   - A screen left on for weeks accumulates cruft, so we hard-reload the
-     page once a day at 04:10 local time.
-===================================================================== */
-async function startRealtime() {
-  try {
-    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
-    const sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-    sb.channel("player-celebrations")
-      .on("postgres_changes", { event: "*", schema: "public", table: "celebration_events" }, () => pollCelebrations())
-      .subscribe();
-  } catch (e) { /* realtime unavailable — polling covers us */ }
-}
-
-function scheduleDailyReload() {
-  const now = new Date(), next = new Date(now);
-  next.setHours(4, 10, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
-  setTimeout(() => location.reload(), next - now);
-}
-
-(function boot() {
-  if (CONFIG.BG_VIDEO_URL) { const bg = document.getElementById("bg-video"); bg.src = CONFIG.BG_VIDEO_URL; bg.style.display = "block"; bg.play().catch(() => {}); }
-  fitStage(); window.addEventListener("resize", fitStage);
-  tickClock(); setInterval(tickClock, 1000);
-  pollCelebrations(); setInterval(pollCelebrations, CONFIG.CELEBRATION_POLL_SECONDS * 1000);
+async function start() {
+  const { data: { user } } = await sb.auth.getUser();
+  $("who").textContent = user.email;
+  $("login").style.display = "none";
+  $("app").style.display = "block";
+  await Promise.all([loadBrokers(), loadCelebrations(), loadRuns()]);
   startRealtime();
-  scheduleDailyReload();
-  loop();
-})();
+}
+
+/* ---------------- realtime ----------------
+   Live updates pushed by Supabase Realtime. Requires the four tables to be
+   added to the `supabase_realtime` publication (see supabase-realtime-setup.sql).
+   If the websocket drops or Realtime isn't enabled yet, we quietly fall back
+   to polling every 90 seconds, and always refresh when the tab regains focus. */
+let realtimeUp = false, fallbackPoll = null;
+const debounce = (fn, ms) => { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
+const refreshBrokers = debounce(loadBrokers, 700);
+const refreshCelebrations = debounce(loadCelebrations, 400);
+const refreshRuns = debounce(loadRuns, 700);
+const refreshAll = () => { loadBrokers(); loadCelebrations(); loadRuns(); };
+
+function startRealtime() {
+  sb.channel("admin-live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "brokers" }, refreshBrokers)
+    .on("postgres_changes", { event: "*", schema: "public", table: "media_assets" }, refreshBrokers)
+    .on("postgres_changes", { event: "*", schema: "public", table: "celebration_events" }, refreshCelebrations)
+    .on("postgres_changes", { event: "*", schema: "public", table: "ingestion_runs" }, refreshRuns)
+    .subscribe((status) => {
+      realtimeUp = (status === "SUBSCRIBED");
+      clearInterval(fallbackPoll);
+      if (!realtimeUp) fallbackPoll = setInterval(refreshAll, 90000);
+    });
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && $("app").style.display !== "none") refreshAll();
+});
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  ["brokers", "celebrations", "pipeline"].forEach(t => $(`tab-${t}`).style.display = (b.dataset.tab === t ? "block" : "none"));
+});
+
+/* ---------------- brokers ---------------- */
+async function loadBrokers() {
+  const { data, error } = await sb.from("brokers").select("*").order("full_name");
+  if (error) { toast(error.message); return; }
+  brokers = data;
+  const { data: media } = await sb.from("media_assets").select("*").order("priority");
+  mediaByBroker = {};
+  (media || []).forEach(m => { (mediaByBroker[m.broker_id] ||= []).push(m); });
+  $("cel-broker").innerHTML = `<option value="">Select a broker…</option>` +
+    brokers.filter(b => b.is_broker)
+      .map(b => `<option value="${b.id}">${b.display_name || b.full_name}${b.branch_name ? " — " + b.branch_name : ""}</option>`)
+      .join("");
+  renderBrokers();
+}
+
+function bestMedia(bid, kind, variant) {
+  const list = (mediaByBroker[bid] || []).filter(m => m.kind === kind && m.status === "ready" && m.storage_path);
+  if (!variant) return list[0] || null;
+  return list.find(m => m.variant === variant)
+      || (variant === "podium" ? list.find(m => m.variant === "default") : null)
+      || null;
+}
+function initials(n) { return (n || "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join(""); }
+
+function renderBrokers() {
+  const q = $("broker-search").value.trim().toLowerCase();
+  const f = $("broker-filter").value;
+  const rows = brokers.filter(b => {
+    if (f === "board" && !b.show_on_leaderboard) return false;
+    if (f === "brokers" && !b.is_broker) return false;
+    if (q && !`${b.full_name} ${b.display_name || ""} ${b.designation || ""} ${b.branch_name || ""}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $("broker-count").textContent = `${rows.length} shown`;
+  $("broker-rows").innerHTML = rows.map(b => {
+    const photo = bestMedia(b.id, "photo", "row") || bestMedia(b.id, "photo", "podium"), webm = bestMedia(b.id, "webm");
+    const av = photo ? `<img class="avatar" src="${mediaPublicUrl(photo.storage_path)}">` : `<span class="avatar">${initials(b.display_name || b.full_name)}</span>`;
+    const mediaPill = webm ? `<span class="pill on">webm</span>` : photo ? `<span class="pill neutral">photo</span>` : `<span class="pill off">initials</span>`;
+    return `<tr class="rowlink" data-id="${b.id}">
+      <td>${av}</td>
+      <td><strong>${b.display_name || b.full_name}</strong>${b.left_at ? ' <span class="pill off">left</span>' : ""}</td>
+      <td>${b.designation || ""}</td><td>${b.branch_name || ""}</td>
+      <td>${mediaPill}</td>
+      <td>${b.show_on_leaderboard ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>'}</td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll("#broker-rows tr").forEach(tr => tr.onclick = () => openDrawer(Number(tr.dataset.id)));
+}
+$("broker-search").oninput = renderBrokers;
+$("broker-filter").onchange = renderBrokers;
+
+$("new-broker").onclick = async () => {
+  const sid = prompt("Source agent id (users.id from the CMS extract):");
+  if (!sid) return;
+  const name = prompt("Full name:");
+  if (!name) return;
+  const { data, error } = await sb.from("brokers")
+    .insert({ source_agent_id: Number(sid), full_name: name, is_broker: true, show_on_leaderboard: false, source_status: "Enabled" })
+    .select().single();
+  if (error) { toast(error.message); return; }
+  brokers.push(data); renderBrokers(); openDrawer(data.id);
+};
+
+/* ---------------- drawer ---------------- */
+function openDrawer(id) {
+  current = brokers.find(b => b.id === id);
+  $("d-name").textContent = current.full_name;
+  $("d-meta").textContent = `source id ${current.source_agent_id} · ${current.source_status || ""}`;
+  $("d-display").value = current.display_name || "";
+  $("d-desig").value = current.designation || "";
+  $("d-branch").value = current.branch_name || "";
+  $("d-division").value = current.division || "";
+  $("d-notes").value = current.notes || "";
+  $("d-isbroker").checked = !!current.is_broker;
+  $("d-onboard").checked = !!current.show_on_leaderboard;
+  $("d-left").value = current.left_at || "";
+  const photo = bestMedia(id, "photo", "podium"), rowPhoto = bestMedia(id, "photo", "row"), webm = bestMedia(id, "webm");
+  $("d-photo-prev").src = photo ? mediaPublicUrl(photo.storage_path) : "";
+  $("d-row-prev").src = rowPhoto ? mediaPublicUrl(rowPhoto.storage_path) : "";
+  $("d-webm-prev").src = webm ? mediaPublicUrl(webm.storage_path) : "";
+  $("d-photo-file").value = ""; $("d-row-file").value = ""; $("d-webm-file").value = "";
+  const wRow = (mediaByBroker[id] || []).find(m => m.kind === "webm");
+  $("d-webm-status").value = wRow && !wRow.storage_path ? wRow.status : "missing";
+  $("d-msg").textContent = "";
+  $("drawer").style.display = "block"; $("drawer-back").style.display = "block";
+}
+const closeDrawer = () => { $("drawer").style.display = "none"; $("drawer-back").style.display = "none"; current = null; };
+$("d-close").onclick = closeDrawer; $("drawer-back").onclick = closeDrawer;
+
+async function uploadAsset(brokerId, kind, file, variant = "default") {
+  const ext = file.name.split(".").pop().toLowerCase();
+  const path = `${brokerId}/${kind}-${variant}-${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from("media").upload(path, file, { upsert: true });
+  if (upErr) throw upErr;
+  const { error: dbErr } = await sb.from("media_assets")
+    .insert({ broker_id: brokerId, kind, status: "ready", storage_path: path, priority: 10, variant });
+  if (dbErr) throw dbErr;
+}
+
+$("d-save").onclick = async () => {
+  if (!current) return;
+  $("d-save").disabled = true; $("d-msg").textContent = "Saving…";
+  try {
+    const patch = {
+      display_name: $("d-display").value.trim() || null,
+      designation: $("d-desig").value.trim() || null,
+      branch_name: $("d-branch").value.trim() || null,
+      division: $("d-division").value.trim() || null,
+      notes: $("d-notes").value.trim() || null,
+      is_broker: $("d-isbroker").checked,
+      show_on_leaderboard: $("d-onboard").checked,
+      left_at: $("d-left").value || null,
+    };
+    const { error } = await sb.from("brokers").update(patch).eq("id", current.id);
+    if (error) throw error;
+
+    const photoFile = $("d-photo-file").files[0];
+    if (photoFile) await uploadAsset(current.id, "photo", photoFile, "podium");
+    const rowFile = $("d-row-file").files[0];
+    if (rowFile) await uploadAsset(current.id, "photo", rowFile, "row");
+    const webmFile = $("d-webm-file").files[0];
+    if (webmFile) await uploadAsset(current.id, "webm", webmFile, "default");
+
+    if (!webmFile && !bestMedia(current.id, "webm")) {
+      // track production status for a video that doesn't exist yet
+      const status = $("d-webm-status").value;
+      const existing = (mediaByBroker[current.id] || []).find(m => m.kind === "webm" && !m.storage_path);
+      if (existing) await sb.from("media_assets").update({ status }).eq("id", existing.id);
+      else if (status === "in_production") await sb.from("media_assets").insert({ broker_id: current.id, kind: "webm", status, priority: 100 });
+    }
+
+    toast("Saved");
+    closeDrawer();
+    await loadBrokers();
+  } catch (e) { $("d-msg").textContent = e.message; }
+  $("d-save").disabled = false;
+};
+
+/* ---------------- celebrations ---------------- */
+async function loadCelebrations() {
+  // Two separate queries: with a big pending backlog, a single "latest 60"
+  // fetch fills up with pending rows and the Recent list comes back empty.
+  const sel = "*, brokers(full_name, display_name, branch_name)";
+  const [pendRes, recentRes] = await Promise.all([
+    sb.from("celebration_events").select(sel).eq("state", "pending").order("created_at", { ascending: false }).limit(100),
+    sb.from("celebration_events").select(sel).neq("state", "pending").order("created_at", { ascending: false }).limit(15),
+  ]);
+  const error = pendRes.error || recentRes.error;
+  if (error) { toast(error.message); return; }
+  const pending = pendRes.data || [], recent = recentRes.data || [];
+  $("celeb-badge").textContent = pending.length ? `(${pending.length})` : "";
+  // keep any half-typed headline if a live update re-renders the table mid-typing
+  const drafts = {};
+  document.querySelectorAll('#celeb-pending input[id^="hl-"]').forEach(i => { if (i.value.trim()) drafts[i.id] = i.value; });
+  const fmt = (v) => v == null ? "" : `AED ${Number(v).toLocaleString("en-US")}`;
+  const bname = (c) => c.brokers ? (c.brokers.display_name || c.brokers.full_name) : `broker #${c.broker_id}`;
+  $("celeb-pending").innerHTML = pending.length ? pending.map(c => `
+    <tr>
+      <td><strong>${bname(c)}</strong><br><span style="font-size:12px;color:var(--powder);">deal ${c.deal_id}</span></td>
+      <td>${fmt(c.sale_value)}<br><span style="font-size:12px;color:var(--powder);">commission ${fmt(c.commission_value)}</span></td>
+      <td style="width:38%;"><input placeholder="Headline — e.g. 3 bedrooms in Palm Jumeirah" id="hl-${c.id}" value="${c.headline || ""}"></td>
+      <td style="white-space:nowrap;">
+        <button class="small" onclick="window._approve(${c.id})">Approve</button>
+        <button class="small ghost" onclick="window._skip(${c.id})">Skip</button>
+      </td>
+    </tr>`).join("") : `<tr><td style="color:var(--powder);">Nothing pending — new closed deals appear here automatically.</td></tr>`;
+  $("celeb-recent").innerHTML = recent.length ? recent.map(c => `
+    <tr><td>${bname(c)}</td><td>${c.headline || ""}</td><td>${fmt(c.sale_value)}</td>
+    <td><span class="pill ${c.state === "played" ? "on" : "neutral"}">${c.state}</span></td>
+    <td style="text-align:right;"><button class="small ghost" onclick="window._replay(${c.id})">Play again</button></td></tr>`).join("")
+    : `<tr><td style="color:var(--powder);">Nothing approved, played or skipped yet.</td></tr>`;
+  Object.entries(drafts).forEach(([id, v]) => { const el = $(id); if (el && !el.value.trim()) el.value = v; });
+}
+window._approve = async (id) => {
+  const headline = $(`hl-${id}`).value.trim();
+  if (!headline) { toast("Add a headline first"); return; }
+  const { error } = await sb.from("celebration_events").update({ state: "approved", headline }).eq("id", id);
+  if (error) toast(error.message); else { toast("Approved — will play on screens"); loadCelebrations(); }
+};
+window._replay = async (id) => {
+  const { error } = await sb.from("celebration_events").update({ state: "approved" }).eq("id", id);
+  if (error) toast(error.message); else { toast("Queued again — screens will play it shortly"); loadCelebrations(); }
+};
+window._skip = async (id) => {
+  const { error } = await sb.from("celebration_events").update({ state: "skipped" }).eq("id", id);
+  if (error) toast(error.message); else loadCelebrations();
+};
+
+$("cel-send").onclick = async () => {
+  const broker_id = Number($("cel-broker").value);
+  const headline = $("cel-headline").value.trim();
+  if (!broker_id) { toast("Choose a broker"); return; }
+  if (!headline) { toast("Add a headline"); return; }
+  $("cel-send").disabled = true;
+  const { error } = await sb.from("celebration_events").insert({
+    broker_id, headline,
+    sale_value: Number($("cel-value").value) || null,
+    commission_value: Number($("cel-comm").value) || null,
+    state: "approved",
+  });
+  $("cel-send").disabled = false;
+  if (error) { toast(error.message); return; }
+  toast("Sent — screens will play it in a moment");
+  $("cel-headline").value = ""; $("cel-value").value = ""; $("cel-comm").value = ""; $("cel-broker").value = "";
+  loadCelebrations();
+};
+
+/* ---------------- pipeline ---------------- */
+async function loadRuns() {
+  const { data, error } = await sb.from("ingestion_runs").select("*").order("id", { ascending: false }).limit(20);
+  if (error) { toast(error.message); return; }
+  $("run-rows").innerHTML = data.map(r => `
+    <tr><td>${r.run_date}</td><td>${r.source}</td><td>${r.rows_received ?? ""}</td><td>${r.rows_upserted ?? ""}</td>
+    <td><span class="pill ${r.status === "success" ? "on" : "off"}">${r.status}</span></td>
+    <td style="font-size:12px; max-width:280px;">${r.error || ""}</td>
+    <td style="font-size:12px;">${new Date(r.finished_at || r.started_at).toLocaleString("en-GB")}</td></tr>`).join("");
+
+  const latestOk = data.find(r => r.status === "success");
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const healthy = latestOk && latestOk.run_date >= yesterday;
+  $("pipeline-pill").className = `pill ${healthy ? "on" : "off"}`;
+  $("pipeline-pill").textContent = healthy ? `pipeline: ok (${latestOk.run_date})` : "pipeline: attention";
+  $("pipeline-status").innerHTML = healthy
+    ? `<div class="statusline ok">Latest successful ingest covers ${latestOk.run_date} — the pipeline is healthy.</div>`
+    : `<div class="statusline warn">No successful ingest for yesterday yet. Check the Metabase alert, the n8n workflow, and the rows below.</div>`;
+}
 </script>
 </body>
 </html>
