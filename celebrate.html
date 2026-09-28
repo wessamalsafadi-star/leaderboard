@@ -92,6 +92,10 @@
       <p class="muted" style="margin-top:0;">Plays on all screens within moments, for 15 seconds each.</p>
       <label>Broker</label><select id="cel-broker"></select>
       <div class="grid2">
+        <div><label>Second broker (optional — shared deal)</label><select id="cel-broker2"></select></div>
+        <div><label>Third broker (optional)</label><select id="cel-broker3"></select></div>
+      </div>
+      <div class="grid2">
         <div><label>Headline (e.g. 3 bedrooms in Palm Jumeirah)</label><input id="cel-headline"></div>
         <div><label>Sale value (AED)</label><input id="cel-value" type="number" min="0"></div>
       </div>
@@ -155,22 +159,28 @@ async function loadBrokers() {
        <p class="muted">This account isn't set up as a manager yet. Ask the leaderboard admin to add your email, then sign in again.</p></div>`;
     return false;
   }
-  $("cel-broker").innerHTML = `<option value="">Select a broker…</option>` +
-    data.filter(b => b.is_broker && !b.left_at)
-      .map(b => `<option value="${b.id}">${b.display_name || b.full_name}${b.branch_name ? " — " + b.branch_name : ""}</option>`)
-      .join("");
+  brokersById = Object.fromEntries(data.map(b => [b.id, b.display_name || b.full_name]));
+  const opts = data.filter(b => b.is_broker && !b.left_at)
+    .map(b => `<option value="${b.id}">${b.display_name || b.full_name}${b.branch_name ? " — " + b.branch_name : ""}</option>`)
+    .join("");
+  $("cel-broker").innerHTML = `<option value="">Select a broker…</option>` + opts;
+  ["cel-broker2", "cel-broker3"].forEach(id => $(id).innerHTML = `<option value="">None</option>` + opts);
   return true;
 }
+let brokersById = {};
+const eventNames = (c) => (c.broker_ids && c.broker_ids.length)
+  ? c.broker_ids.map(id => brokersById[id] || `broker #${id}`).join(" & ")
+  : (c.brokers ? (c.brokers.display_name || c.brokers.full_name) : "");
 
 /* ---------------- send ---------------- */
 $("cel-send").onclick = async () => {
-  const broker_id = Number($("cel-broker").value);
+  const broker_ids = [...new Set(["cel-broker", "cel-broker2", "cel-broker3"].map(id => Number($(id).value)).filter(Boolean))];
   const headline = $("cel-headline").value.trim();
-  if (!broker_id) { toast("Choose a broker"); return; }
+  if (!broker_ids.length) { toast("Choose a broker"); return; }
   if (!headline) { toast("Add a headline"); return; }
   $("cel-send").disabled = true;
   const { error } = await sb.from("celebration_events").insert({
-    broker_id, headline,
+    broker_id: broker_ids[0], broker_ids, headline,
     sale_value: Number($("cel-value").value) || null,
     commission_value: Number($("cel-comm").value) || null,
     state: "approved",
@@ -178,21 +188,22 @@ $("cel-send").onclick = async () => {
   $("cel-send").disabled = false;
   if (error) { toast(error.message); return; }
   toast("Sent — screens will play it in a moment");
-  $("cel-headline").value = ""; $("cel-value").value = ""; $("cel-comm").value = ""; $("cel-broker").value = "";
+  $("cel-headline").value = ""; $("cel-value").value = ""; $("cel-comm").value = "";
+  ["cel-broker", "cel-broker2", "cel-broker3"].forEach(id => $(id).value = "");
   loadRecent();
 };
 
 /* ---------------- recent ---------------- */
 async function loadRecent() {
   const { data, error } = await sb.from("celebration_events")
-    .select("headline, sale_value, state, created_at, brokers(full_name, display_name)")
+    .select("headline, sale_value, state, created_at, broker_ids, brokers(full_name, display_name)")
     .in("state", ["approved", "played"])
     .order("created_at", { ascending: false })
     .limit(10);
   if (error || !data) return;
   $("recent-rows").innerHTML = data.length ? data.map(c => `
     <tr>
-      <td><strong>${c.brokers ? (c.brokers.display_name || c.brokers.full_name) : ""}</strong></td>
+      <td><strong>${eventNames(c)}</strong></td>
       <td>${c.headline || ""}</td>
       <td>${fmt(c.sale_value)}</td>
       <td><span class="pill ${c.state === "played" ? "on" : "neutral"}">${c.state === "approved" ? "queued" : "played"}</span></td>
