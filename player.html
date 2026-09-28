@@ -39,6 +39,10 @@
     -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 110px), rgba(0,0,0,0.55) calc(100% - 55px), transparent 100%);
     mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 110px), rgba(0,0,0,0.55) calc(100% - 55px), transparent 100%);
   }
+  /* multi-broker celebrations: same treatment as the podium — cutouts fill
+     their box (contain, bottom-anchored) and a blur halo melts the hard
+     bottom edge of each cutout into the background */
+  #c-people .media-slot.free { overflow: visible; }
   .portrait-card { width: 68%; aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden;
     background: rgba(255,255,255,0.03); backdrop-filter: blur(8px);
     display: flex; align-items: center; justify-content: center; }
@@ -152,19 +156,18 @@
   <div class="scene" id="scene-congrats">
     <!-- headline sits on the lowest layer so the celebrated agent's portrait overlaps it -->
     <span style="position:absolute; left:18px; top:47px; width:1878px; font-family:var(--font-serif); font-size:225px; text-align:center; white-space:nowrap; line-height:1; color:var(--bh-white); z-index:1;">Congratulations</span>
-    <div style="position:absolute; left:45px; top:500px; width:924px; display:flex; flex-direction:column; align-items:center; gap:6px; z-index:3;">
+    <div id="c-panel" style="position:absolute; left:45px; top:420px; width:924px; display:flex; flex-direction:column; align-items:center; gap:6px; z-index:3;">
+      <span style="font-family:var(--font-epic); font-size:80px; text-align:center; color:var(--bh-white);">Deal Closed</span>
       <span id="c-headline" style="font-family:var(--font-epic); font-size:27px; text-align:center; color:var(--bh-white);"></span>
       <span id="c-value" style="font-family:var(--font-serif); font-weight:600; font-size:120px; text-align:center; white-space:nowrap; line-height:1.35; color:var(--bh-sand);"></span>
       <span style="font-family:var(--font-epic); font-size:40px; text-align:center; color:var(--bh-white);">Sale value</span>
       <span id="c-commission" style="font-family:var(--font-epic); font-size:70px; text-align:center; line-height:1.2; color:var(--bh-white); margin-top:56px;"></span>
       <span style="font-family:var(--font-epic); font-size:24px; text-align:center; color:var(--bh-white);">Commission value</span>
     </div>
-    <div class="media-slot" id="c-media" style="left:960px; top:40px; width:960px; height:1040px; z-index:2;"></div>
-    <div class="halo" style="left:940px; top:760px; width:1000px; height:320px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="name-glow" style="position:absolute; left:1035px; top:800px; width:780px; padding:60px 40px; display:flex; flex-direction:column; gap:5px; align-items:center; z-index:6;">
-      <span id="c-name" style="font-family:var(--font-serif); font-size:58px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
-      <span id="c-title" style="font-family:var(--font-epic); font-size:29px; text-align:center; line-height:100%; color:var(--bh-white);"></span>
-    </div>
+    <!-- up to 3 brokers per deal: portraits + name glows are generated into
+         this container from CELEBRATION_LAYOUTS below (1 / 2 / 3 people) -->
+    <div id="c-people"></div>
+    <div class="halo" id="c-halo" style="left:940px; top:760px; width:1000px; height:320px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   </div>
 
   <span id="status" style="position:absolute; left:16px; bottom:10px; font-family:var(--font-epic); font-size:12px; color:rgba(255,255,255,0.3); z-index:30;"></span>
@@ -355,27 +358,11 @@ function renderBoard(scene) {
    Celebrations (take-over)
    Each celebration shows CELEBRATION_PLAYS times in total: the first
    showing happens as soon as it's approved, and each repeat is scheduled
-   CELEBRATION_REPLAY_GAP_MINUTES later on this screen.
-
-   MULTI-SCREEN: every screen decides for itself what it has already shown
-   (a "seen" list kept in this browser's localStorage). The DB `played`
-   state is still set after the first showing so the admin queue looks
-   right, but it is NOT used to decide whether THIS screen plays it —
-   otherwise the first screen to finish would hide the celebration from
-   all the others. This needs pending_celebrations() to return recently
-   approved events regardless of played state (see the SQL note).
+   CELEBRATION_REPLAY_GAP_MINUTES later on this screen. The event is marked
+   `played` in the DB after the FIRST showing (so the admin queue behaves
+   exactly as before); the repeats live in this screen's memory.
 ===================================================================== */
 let celebrationQueue = [], scheduledReplays = [], celebrating = false;
-
-const SEEN_KEY = "bh-celebrations-seen";
-let seen = new Set();
-try { seen = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch (e) {}
-function remember(key) {
-  seen.add(key);
-  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-300))); } catch (e) {}
-}
-// key on id + approval time so "Play again" (which re-approves) counts as a new showing
-const celebKey = (c) => `${c.id}:${c.approved_at || c.created_at}`;
 
 function promoteDueReplays() {
   const now = Date.now();
@@ -387,12 +374,74 @@ function promoteDueReplays() {
 async function pollCelebrations() {
   try {
     const pending = await rpc("pending_celebrations") || [];
-    const queued = new Set([...celebrationQueue, ...scheduledReplays].map(celebKey));
-    pending.forEach(c => {
-      const k = celebKey(c);
-      if (!seen.has(k) && !queued.has(k)) celebrationQueue.push(c);
-    });
+    const known = new Set([...celebrationQueue, ...scheduledReplays].map(c => c.id));
+    pending.forEach(c => { if (!known.has(c.id)) celebrationQueue.push(c); });
   } catch (e) { /* silent; board keeps playing */ }
+}
+
+/* Portrait + name positions for 1, 2 or 3 brokers on one deal (stage px).
+   2: side by side in the right half. 3: staggered — front-left, low-centre,
+   high-right — so the three cutouts overlap like a group photo. `z` orders
+   the overlap (higher = in front). `pad` is the name-glow padding. */
+const CELEBRATION_LAYOUTS = {
+  1: [
+    { media: { left: 960, top: 40, w: 960, h: 1040 }, z: 2, name: { left: 1035, top: 800, w: 780, size: 58, tsize: 29, pad: "60px 40px" }, initials: 170 },
+  ],
+  // Boxes are bottom-anchored: the cutout sits on the box's bottom edge and
+  // scales to fill it (contain). `halo` is a blur band over that bottom edge.
+  // 2: both stand on the bottom of the screen, shoulder to shoulder.
+  2: [
+    { media: { left: 650, top: 80, w: 730, h: 1000 }, z: 3, halo: { left: 620, top: 850, w: 750, h: 230 }, name: { left: 660, top: 905, w: 670, size: 52, tsize: 26, pad: "34px 28px" }, initials: 165 },
+    { media: { left: 1300, top: 80, w: 730, h: 1000 }, z: 2, halo: { left: 1270, top: 850, w: 690, h: 230 }, name: { left: 1310, top: 905, w: 620, size: 52, tsize: 26, pad: "34px 28px" }, initials: 165 },
+  ],
+  // 3: middle person stands on the bottom of the screen and is in front of the
+  // other two (z 999); left and right are lifted high, behind, with their own halos.
+  // (tops stay below the date/time chips, which end at y≈106)
+  3: [
+    { media: { left: 555, top: 150, w: 640, h: 680 }, z: 3, halo: { left: 525, top: 700, w: 715, h: 220 }, name: { left: 510, top: 735, w: 600, size: 46, tsize: 23, pad: "30px 24px" }, initials: 145 },
+    { media: { left: 945, top: 341, w: 654, h: 739 }, z: 999, halo: { left: 945, top: 970, w: 745, h: 230 }, name: { left: 945, top: 945, w: 640, size: 46, tsize: 23, pad: "30px 24px" }, initials: 145 },
+    { media: { left: 1415, top: 90, w: 580, h: 680 }, z: 2, halo: { left: 1385, top: 640, w: 590, h: 220 }, name: { left: 1470, top: 665, w: 480, size: 46, tsize: 23, pad: "30px 24px" }, initials: 135 },
+  ],
+};
+
+// value panel: centred in the left half for one broker; pushed hard left when
+// two or three portraits need the room
+const CELEBRATION_PANEL = { 1: { left: 45, w: 924 }, 2: { left: -60, w: 800 }, 3: { left: -60, w: 800 } };
+
+function renderCelebrationPeople(people) {
+  const n = Math.min(Math.max(people.length, 1), 3);
+  const layout = CELEBRATION_LAYOUTS[n];
+  const host = document.getElementById("c-people");
+  host.innerHTML = "";
+  // the shared bottom halo only suits the single large portrait;
+  // multi layouts get one halo per portrait (defined in the layout)
+  document.getElementById("c-halo").style.display = n === 1 ? "" : "none";
+  const panel = CELEBRATION_PANEL[n];
+  document.getElementById("c-panel").style.left = panel.left + "px";
+  document.getElementById("c-panel").style.width = panel.w + "px";
+  layout.forEach((slot, i) => {
+    const p = people[i] || {};
+    const m = document.createElement("div");
+    m.className = n === 1 ? "media-slot" : "media-slot free";
+    m.style.cssText = `left:${slot.media.left}px; top:${slot.media.top}px; width:${slot.media.w}px; height:${slot.media.h}px; z-index:${slot.z};`;
+    host.appendChild(m);
+    renderPortrait(m, p, slot.initials);
+    if (slot.halo) {
+      const h = document.createElement("div");
+      h.className = "halo";
+      h.style.cssText = `left:${slot.halo.left}px; top:${slot.halo.top}px; width:${slot.halo.w}px; height:${slot.halo.h}px; z-index:${slot.z + 1};`;
+      h.innerHTML = "<i></i><i></i><i></i><i></i><i></i><i></i><i></i>";
+      host.appendChild(h);
+    }
+    const g = document.createElement("div");
+    g.className = "name-glow";
+    g.style.cssText = `position:absolute; left:${slot.name.left}px; top:${slot.name.top}px; width:${slot.name.w}px; padding:${slot.name.pad}; display:flex; flex-direction:column; gap:5px; align-items:center; z-index:${slot.z + 2};`;
+    g.innerHTML = `<span style="font-family:var(--font-serif); font-size:${slot.name.size}px; text-align:center; line-height:100%; color:var(--bh-white); white-space:nowrap;"></span>
+      <span style="font-family:var(--font-epic); font-size:${slot.name.tsize}px; text-align:center; line-height:100%; color:var(--bh-white);"></span>`;
+    g.children[0].textContent = p.name || "";
+    g.children[1].textContent = p.designation || "";
+    host.appendChild(g);
+  });
 }
 
 async function playCelebration(c) {
@@ -400,14 +449,14 @@ async function playCelebration(c) {
   document.getElementById("c-headline").textContent = c.headline || "";
   document.getElementById("c-value").textContent = fmtValue(c.sale_value);
   document.getElementById("c-commission").textContent = fmtValue(c.commission_value);
-  document.getElementById("c-name").textContent = c.name || "";
-  document.getElementById("c-title").textContent = c.designation || "";
-  renderPortrait(document.getElementById("c-media"), c, 170);
+  // `brokers` is the ordered array from pending_celebrations(); fall back to the
+  // legacy single-broker columns if the RPC ever returns without it
+  const people = Array.isArray(c.brokers) && c.brokers.length ? c.brokers.slice(0, 3) : [c];
+  renderCelebrationPeople(people);
   showScene("scene-congrats");
   await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_SECONDS * 1000));
   const playsDone = (c._plays || 0) + 1;
   if (playsDone === 1) {
-    remember(celebKey(c));
     try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
   }
   if (playsDone < (CONFIG.CELEBRATION_PLAYS || 1)) {
