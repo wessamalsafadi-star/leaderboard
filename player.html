@@ -167,7 +167,7 @@
     <!-- up to 3 brokers per deal: portraits + name glows are generated into
          this container from CELEBRATION_LAYOUTS below (1 / 2 / 3 people) -->
     <div id="c-people"></div>
-    <div class="halo" id="c-halo" style="left:940px; top:760px; width:1000px; height:320px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="halo" id="c-halo" style="left:940px; top:760px; width:1000px; height:320px; z-index: 3;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   </div>
 
   <span id="status" style="position:absolute; left:16px; bottom:10px; font-family:var(--font-epic); font-size:12px; color:rgba(255,255,255,0.3); z-index:30;"></span>
@@ -188,20 +188,22 @@ const CONFIG = {
   CELEBRATION_POLL_SECONDS: 30,    // how often to check the approval queue
   CELEBRATION_SECONDS: 15,         // how long each celebration plays
   CELEBRATION_GAP_SECONDS: 3,      // breather between back-to-back celebrations
-  CELEBRATION_PLAYS: 2,            // each celebration shows this many times in total
-  CELEBRATION_REPLAY_GAP_MINUTES: 30, // wait between the showings
+  CELEBRATION_TAKEOVER_MINUTES: 10, // approved within this long ago -> interrupts the board once, immediately
+  // after that first showing a celebration stays in the rotation (one after every
+  // board scene, round-robin) until 24h after approval — the window is set in
+  // the pending_celebrations() function in Supabase
   SCENES: [
     // deal_type: "Sale" | "Rent" | undefined (all deals)
-    { title: "Top Sales Value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Top Leasing Value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
-    { title: "Top Sales Volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 45 },
-    { title: "Top Leasing Volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 45 },
+    { title: "Top Sales Value",       metric: "rank_by_value",      date_field: "reserved", deal_type: "Sale", seconds: 25 },
+    { title: "Top Leasing Value",     metric: "rank_by_value",      date_field: "reserved", deal_type: "Rent", seconds: 25 },
+    { title: "Top Sales Volume",      metric: "rank_by_deals",      date_field: "reserved", deal_type: "Sale", seconds: 25 },
+    { title: "Top Leasing Volume",    metric: "rank_by_deals",      date_field: "reserved", deal_type: "Rent", seconds: 25 },
     //{ title: "Closed Deals",          metric: "rank_by_commission", date_field: "closed",   seconds: 45 },
     // activity scenes: source = activity_leaderboard() over activity_facts (CMS activities, ingested daily by n8n)
     // activity_type: "Viewing" (counts Completed only) | "Offer" (counts all except Rejected/Cancelled)
     // lead_type: "Sale" | "Rent" | undefined (all)
-    { title: "Most Viewings",         metric: "rank_by_activity",   source: "activity", activity_type: "Viewing", seconds: 45 },
-    { title: "Most Offers",           metric: "rank_by_activity",   source: "activity", activity_type: "Offer",   seconds: 45 },
+    { title: "Most Viewings",         metric: "rank_by_activity",   source: "activity", activity_type: "Viewing", seconds: 25 },
+    { title: "Most Offers",           metric: "rank_by_activity",   source: "activity", activity_type: "Offer",   seconds: 25 },
   ],
 };
 
@@ -355,28 +357,40 @@ function renderBoard(scene) {
 }
 
 /* =====================================================================
-   Celebrations (take-over)
-   Each celebration shows CELEBRATION_PLAYS times in total: the first
-   showing happens as soon as it's approved, and each repeat is scheduled
-   CELEBRATION_REPLAY_GAP_MINUTES later on this screen. The event is marked
-   `played` in the DB after the FIRST showing (so the admin queue behaves
-   exactly as before); the repeats live in this screen's memory.
+   Celebrations
+   - pending_celebrations() returns every celebration approved in the last
+     24 hours (its window lives in the DB function).
+   - A freshly approved one (within CELEBRATION_TAKEOVER_MINUTES) interrupts
+     the board straight away for its first showing and is marked `played`.
+   - All of them then rotate: after every board scene the loop plays the
+     next active celebration, round-robin, until they age out of the 24h
+     window. Older ones seen for the first time (e.g. after the daily reload)
+     go straight into the rotation without a take-over.
 ===================================================================== */
-let celebrationQueue = [], scheduledReplays = [], celebrating = false;
-
-function promoteDueReplays() {
-  const now = Date.now();
-  for (let i = scheduledReplays.length - 1; i >= 0; i--) {
-    if (scheduledReplays[i]._dueAt <= now) celebrationQueue.push(scheduledReplays.splice(i, 1)[0]);
-  }
-}
+let celebrationQueue = [];        // first showings waiting to take over the screen
+let activeCelebrations = [];      // everything inside the 24h window, oldest first
+let celebrating = false, rotationIdx = 0;
+const seenCelebrations = new Set();
 
 async function pollCelebrations() {
   try {
-    const pending = await rpc("pending_celebrations") || [];
-    const known = new Set([...celebrationQueue, ...scheduledReplays].map(c => c.id));
-    pending.forEach(c => { if (!known.has(c.id)) celebrationQueue.push(c); });
+    const list = await rpc("pending_celebrations") || [];
+    activeCelebrations = list;
+    const fresh = Date.now() - CONFIG.CELEBRATION_TAKEOVER_MINUTES * 60000;
+    list.forEach(c => {
+      if (seenCelebrations.has(c.id)) return;
+      seenCelebrations.add(c.id);
+      const at = new Date(c.approved_at || c.created_at).getTime();
+      if (at >= fresh) celebrationQueue.push(c);
+    });
   } catch (e) { /* silent; board keeps playing */ }
+}
+
+// next celebration in the rotation (null when none are active)
+function nextRotationCelebration() {
+  if (!activeCelebrations.length) return null;
+  rotationIdx = rotationIdx % activeCelebrations.length;
+  return activeCelebrations[rotationIdx++];
 }
 
 /* Portrait + name positions for 1, 2 or 3 brokers on one deal (stage px).
@@ -392,7 +406,7 @@ const CELEBRATION_LAYOUTS = {
   // 2: both stand on the bottom of the screen, shoulder to shoulder.
   2: [
     { media: { left: 650, top: 80, w: 730, h: 1000 }, z: 3, halo: { left: 620, top: 850, w: 750, h: 230 }, name: { left: 660, top: 905, w: 670, size: 52, tsize: 26, pad: "34px 28px" }, initials: 165 },
-    { media: { left: 1300, top: 80, w: 730, h: 1000 }, z: 2, halo: { left: 1270, top: 850, w: 690, h: 230 }, name: { left: 1310, top: 905, w: 620, size: 52, tsize: 26, pad: "34px 28px" }, initials: 165 },
+    { media: { left: 1230, top: 80, w: 730, h: 1000 }, z: 2, halo: { left: 1270, top: 850, w: 690, h: 230 }, name: { left: 1310, top: 905, w: 620, size: 52, tsize: 26, pad: "34px 28px" }, initials: 165 },
   ],
   // 3: middle person stands on the bottom of the screen and is in front of the
   // other two (z 999); left and right are lifted high, behind, with their own halos.
@@ -455,13 +469,8 @@ async function playCelebration(c) {
   renderCelebrationPeople(people);
   showScene("scene-congrats");
   await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_SECONDS * 1000));
-  const playsDone = (c._plays || 0) + 1;
-  if (playsDone === 1) {
-    try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
-  }
-  if (playsDone < (CONFIG.CELEBRATION_PLAYS || 1)) {
-    scheduledReplays.push({ ...c, _plays: playsDone, _dueAt: Date.now() + CONFIG.CELEBRATION_REPLAY_GAP_MINUTES * 60000 });
-  }
+  // no-op once it's already `played` (the DB function only updates approved rows)
+  try { await rpc("mark_celebration_played", { p_id: c.id }); } catch (e) {}
   celebrating = false;
 }
 
@@ -480,29 +489,28 @@ function showScene(id) {
   }, 950); // just past the 900ms scene fade
 }
 
+const breather = () => { showScene(""); return new Promise(r => setTimeout(r, CONFIG.CELEBRATION_GAP_SECONDS * 1000)); };
+
 async function loop() {
   let i = 0;
   for (;;) {
-    promoteDueReplays();
-    // Celebrations take priority over the rotation
+    // 1. freshly approved celebrations take over the screen immediately
     if (celebrationQueue.length) {
       await playCelebration(celebrationQueue.shift());
-      if (celebrationQueue.length) {
-        // more queued: fade to the background for a beat so each one lands as its own moment
-        showScene("");
-        await new Promise(r => setTimeout(r, CONFIG.CELEBRATION_GAP_SECONDS * 1000));
-      }
+      if (celebrationQueue.length) await breather(); // each one lands as its own moment
       continue;
     }
+    // 2. one board scene
     const scene = CONFIG.SCENES[i % CONFIG.SCENES.length]; i++;
     try { await fetchBoard(scene); renderBoard(scene); setStatus(scene); } catch (e) { setStatus(scene, e); }
     showScene("scene-board");
-    // wait scene.seconds, but wake early if a celebration arrives or a replay comes due
+    // wait scene.seconds, but wake early if a new celebration arrives
     const until = Date.now() + scene.seconds * 1000;
-    while (Date.now() < until && !celebrationQueue.length) {
-      promoteDueReplays();
-      await new Promise(r => setTimeout(r, 1000));
-    }
+    while (Date.now() < until && !celebrationQueue.length) await new Promise(r => setTimeout(r, 1000));
+    if (celebrationQueue.length) continue;
+    // 3. then one celebration from the 24h rotation, if any
+    const c = nextRotationCelebration();
+    if (c) { await playCelebration(c); await breather(); }
   }
 }
 
