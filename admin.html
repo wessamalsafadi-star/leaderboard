@@ -116,6 +116,8 @@
         <div class="grid2">
           <div><label>Broker</label><select id="cel-broker"></select></div>
           <div><label>Headline (e.g. 3 bedrooms in Palm Jumeirah)</label><input id="cel-headline"></div>
+          <div><label>Second broker (optional — shared deal)</label><select id="cel-broker2"></select></div>
+          <div><label>Third broker (optional)</label><select id="cel-broker3"></select></div>
           <div><label>Sale value (AED)</label><input id="cel-value" type="number" min="0"></div>
           <div><label>Commission value (AED)</label><input id="cel-comm" type="number" min="0"></div>
         </div>
@@ -123,7 +125,7 @@
       </div>
       <div class="card">
         <h2 style="font-size:22px; margin-bottom:6px;">Pending approval</h2>
-        <p style="font-size:13px; color:var(--powder); margin-top:0;">Approved celebrations play on the office screens. Add a headline before approving — e.g. “3 bedrooms in Palm Jumeirah”.</p>
+        <p style="font-size:13px; color:var(--powder); margin-top:0;">Approved celebrations play on the office screens. Add a headline before approving — e.g. “3 bedrooms in Palm Jumeirah”. When a deal was closed by more than one broker, tick the ones to celebrate together (up to 3) and approve once; anyone left unticked stays in the queue.</p>
         <table><tbody id="celeb-pending"></tbody></table>
       </div>
       <div class="card">
@@ -281,12 +283,18 @@ async function loadBrokers() {
   const { data: media } = await sb.from("media_assets").select("*").order("priority");
   mediaByBroker = {};
   (media || []).forEach(m => { (mediaByBroker[m.broker_id] ||= []).push(m); });
-  $("cel-broker").innerHTML = `<option value="">Select a broker…</option>` +
-    brokers.filter(b => b.is_broker)
-      .map(b => `<option value="${b.id}">${b.display_name || b.full_name}${b.branch_name ? " — " + b.branch_name : ""}</option>`)
-      .join("");
+  const opts = brokers.filter(b => b.is_broker)
+    .map(b => `<option value="${b.id}">${b.display_name || b.full_name}${b.branch_name ? " — " + b.branch_name : ""}</option>`)
+    .join("");
+  $("cel-broker").innerHTML = `<option value="">Select a broker…</option>` + opts;
+  ["cel-broker2", "cel-broker3"].forEach(id => $(id).innerHTML = `<option value="">None</option>` + opts);
   renderBrokers();
 }
+const brokerName = (id) => { const b = brokers.find(x => x.id === Number(id)); return b ? (b.display_name || b.full_name) : `broker #${id}`; };
+// names for an event: prefer broker_ids (multi), fall back to the joined single broker
+const eventNames = (c) => (c.broker_ids && c.broker_ids.length)
+  ? c.broker_ids.map(brokerName).join(" & ")
+  : (c.brokers ? (c.brokers.display_name || c.brokers.full_name) : `broker #${c.broker_id}`);
 
 function bestMedia(bid, kind, variant) {
   const list = (mediaByBroker[bid] || []).filter(m => m.kind === kind && m.status === "ready" && m.storage_path);
@@ -418,7 +426,7 @@ async function loadCelebrations() {
   const sel = "*, brokers(full_name, display_name, branch_name)";
   const [pendRes, recentRes] = await Promise.all([
     sb.from("celebration_events").select(sel).eq("state", "pending").order("created_at", { ascending: false }).limit(100),
-    sb.from("celebration_events").select(sel).neq("state", "pending").order("created_at", { ascending: false }).limit(15),
+    sb.from("celebration_events").select(sel).not("state", "in", "(pending,merged)").order("created_at", { ascending: false }).limit(15),
   ]);
   const error = pendRes.error || recentRes.error;
   if (error) { toast(error.message); return; }
@@ -428,47 +436,87 @@ async function loadCelebrations() {
   const drafts = {};
   document.querySelectorAll('#celeb-pending input[id^="hl-"]').forEach(i => { if (i.value.trim()) drafts[i.id] = i.value; });
   const fmt = (v) => v == null ? "" : `AED ${Number(v).toLocaleString("en-US")}`;
-  const bname = (c) => c.brokers ? (c.brokers.display_name || c.brokers.full_name) : `broker #${c.broker_id}`;
-  $("celeb-pending").innerHTML = pending.length ? pending.map(c => `
+  // The pipeline inserts one pending row per broker on a deal. Group those rows
+  // by deal_id so the admin can tick which brokers to celebrate together.
+  const groups = [];
+  const byDeal = {};
+  pending.forEach(c => {
+    const key = c.deal_id ? `d${c.deal_id}` : `e${c.id}`;
+    if (!byDeal[key]) { byDeal[key] = []; groups.push(byDeal[key]); }
+    byDeal[key].push(c);
+  });
+  pendingGroups = groups;
+  $("celeb-pending").innerHTML = groups.length ? groups.map(g => {
+    g.sort((a, b) => a.id - b.id);
+    const lead = g[0], multi = g.length > 1;
+    const who = multi
+      ? g.map((c, i) => `<label class="toggle" style="margin:0 0 4px; display:flex;"><input type="checkbox" data-group="${lead.id}" data-id="${c.id}" ${i < 3 ? "checked" : ""}> ${brokerName(c.broker_id)}</label>`).join("")
+      : `<strong>${brokerName(lead.broker_id)}</strong>`;
+    return `
     <tr>
-      <td><strong>${bname(c)}</strong><br><span style="font-size:12px;color:var(--powder);">deal ${c.deal_id}</span></td>
-      <td>${fmt(c.sale_value)}<br><span style="font-size:12px;color:var(--powder);">commission ${fmt(c.commission_value)}</span></td>
-      <td style="width:38%;"><input placeholder="Headline — e.g. 3 bedrooms in Palm Jumeirah" id="hl-${c.id}" value="${c.headline || ""}"></td>
+      <td>${who}<span style="font-size:12px;color:var(--powder);">deal ${lead.deal_id ?? "—"}${multi ? ` · ${g.length} brokers — tick up to 3 to celebrate together` : ""}</span></td>
+      <td>${fmt(lead.sale_value)}<br><span style="font-size:12px;color:var(--powder);">commission ${fmt(lead.commission_value)}</span></td>
+      <td style="width:38%;"><input placeholder="Headline — e.g. 3 bedrooms in Palm Jumeirah" id="hl-${lead.id}" value="${lead.headline || ""}"></td>
       <td style="white-space:nowrap;">
-        <button class="small" onclick="window._approve(${c.id})">Approve</button>
-        <button class="small ghost" onclick="window._skip(${c.id})">Skip</button>
+        <button class="small" onclick="window._approve(${lead.id})">Approve${multi ? " ticked" : ""}</button>
+        <button class="small ghost" onclick="window._skip(${lead.id})">Skip${multi ? " all" : ""}</button>
       </td>
-    </tr>`).join("") : `<tr><td style="color:var(--powder);">Nothing pending — new closed deals appear here automatically.</td></tr>`;
+    </tr>`;
+  }).join("") : `<tr><td style="color:var(--powder);">Nothing pending — new closed deals appear here automatically.</td></tr>`;
   $("celeb-recent").innerHTML = recent.length ? recent.map(c => `
-    <tr><td>${bname(c)}</td><td>${c.headline || ""}</td><td>${fmt(c.sale_value)}</td>
+    <tr><td>${eventNames(c)}</td><td>${c.headline || ""}</td><td>${fmt(c.sale_value)}</td>
     <td><span class="pill ${c.state === "played" ? "on" : "neutral"}">${c.state}</span></td>
     <td style="text-align:right;"><button class="small ghost" onclick="window._replay(${c.id})">Play again</button></td></tr>`).join("")
     : `<tr><td style="color:var(--powder);">Nothing approved, played or skipped yet.</td></tr>`;
   Object.entries(drafts).forEach(([id, v]) => { const el = $(id); if (el && !el.value.trim()) el.value = v; });
 }
-window._approve = async (id) => {
-  const headline = $(`hl-${id}`).value.trim();
+let pendingGroups = [];
+const groupOf = (leadId) => pendingGroups.find(g => g[0].id === leadId) || [];
+const tickedIn = (leadId) => {
+  const boxes = [...document.querySelectorAll(`#celeb-pending input[type=checkbox][data-group="${leadId}"]`)];
+  return boxes.length ? boxes.filter(b => b.checked).map(b => Number(b.dataset.id)) : [leadId];
+};
+
+window._approve = async (leadId) => {
+  const headline = $(`hl-${leadId}`).value.trim();
   if (!headline) { toast("Add a headline first"); return; }
-  const { error } = await sb.from("celebration_events").update({ state: "approved", headline }).eq("id", id);
-  if (error) toast(error.message); else { toast("Approved — will play on screens"); loadCelebrations(); }
+  const group = groupOf(leadId), ticked = tickedIn(leadId);
+  if (!ticked.length) { toast("Tick at least one broker"); return; }
+  if (ticked.length > 3) { toast("A celebration can show at most 3 brokers"); return; }
+  const rows = ticked.map(id => group.find(c => c.id === id)).filter(Boolean);
+  const primary = rows[0];
+  // the first ticked row becomes the celebration; the other ticked rows are
+  // folded into it (state "merged") so they leave the queue but keep their history
+  const { error } = await sb.from("celebration_events")
+    .update({ state: "approved", headline, broker_ids: rows.map(c => c.broker_id) })
+    .eq("id", primary.id);
+  if (error) { toast(error.message); return; }
+  const others = rows.slice(1).map(c => c.id);
+  if (others.length) {
+    const { error: e2 } = await sb.from("celebration_events").update({ state: "merged", merged_into: primary.id }).in("id", others);
+    if (e2) toast(e2.message);
+  }
+  toast(rows.length > 1 ? `Approved — ${rows.length} brokers will play together` : "Approved — will play on screens");
+  loadCelebrations();
 };
 window._replay = async (id) => {
   const { error } = await sb.from("celebration_events").update({ state: "approved" }).eq("id", id);
   if (error) toast(error.message); else { toast("Queued again — screens will play it shortly"); loadCelebrations(); }
 };
-window._skip = async (id) => {
-  const { error } = await sb.from("celebration_events").update({ state: "skipped" }).eq("id", id);
+window._skip = async (leadId) => {
+  const ids = groupOf(leadId).map(c => c.id);
+  const { error } = await sb.from("celebration_events").update({ state: "skipped" }).in("id", ids.length ? ids : [leadId]);
   if (error) toast(error.message); else loadCelebrations();
 };
 
 $("cel-send").onclick = async () => {
-  const broker_id = Number($("cel-broker").value);
+  const broker_ids = [...new Set(["cel-broker", "cel-broker2", "cel-broker3"].map(id => Number($(id).value)).filter(Boolean))];
   const headline = $("cel-headline").value.trim();
-  if (!broker_id) { toast("Choose a broker"); return; }
+  if (!broker_ids.length) { toast("Choose a broker"); return; }
   if (!headline) { toast("Add a headline"); return; }
   $("cel-send").disabled = true;
   const { error } = await sb.from("celebration_events").insert({
-    broker_id, headline,
+    broker_id: broker_ids[0], broker_ids, headline,
     sale_value: Number($("cel-value").value) || null,
     commission_value: Number($("cel-comm").value) || null,
     state: "approved",
@@ -476,7 +524,8 @@ $("cel-send").onclick = async () => {
   $("cel-send").disabled = false;
   if (error) { toast(error.message); return; }
   toast("Sent — screens will play it in a moment");
-  $("cel-headline").value = ""; $("cel-value").value = ""; $("cel-comm").value = ""; $("cel-broker").value = "";
+  $("cel-headline").value = ""; $("cel-value").value = ""; $("cel-comm").value = "";
+  ["cel-broker", "cel-broker2", "cel-broker3"].forEach(id => $(id).value = "");
   loadCelebrations();
 };
 
