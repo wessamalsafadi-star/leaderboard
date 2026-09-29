@@ -167,7 +167,7 @@
   <div style="margin-top:8px;"><label>Left the company (leave empty if active)</label><input id="d-left" type="date" style="max-width:200px;"></div>
 
   <h3 style="font-size:19px; margin-top:26px;">Media</h3>
-  <p class="muted" style="margin:4px 0 0;">Screens use the webm when ready, otherwise the photo, otherwise initials.</p>
+  <p class="muted" style="margin:4px 0 0;">Screens use the webm when ready, otherwise the photo, otherwise initials. Uploading a new file replaces the current one.</p>
   <div class="mediarow">
     <img class="preview" id="d-photo-prev" alt="">
     <div style="flex:1;">
@@ -280,7 +280,10 @@ async function loadBrokers() {
   const { data, error } = await sb.from("brokers").select("*").order("full_name");
   if (error) { toast(error.message); return; }
   brokers = data;
-  const { data: media } = await sb.from("media_assets").select("*").order("priority");
+  // Same ordering as the v_broker_media view the screens use: lowest priority
+  // first, then newest first — so the admin and the screens agree on the winner.
+  const { data: media } = await sb.from("media_assets").select("*")
+    .order("priority").order("updated_at", { ascending: false });
   mediaByBroker = {};
   (media || []).forEach(m => { (mediaByBroker[m.broker_id] ||= []).push(m); });
   const opts = brokers.filter(b => b.is_broker)
@@ -370,11 +373,35 @@ function openDrawer(id) {
 const closeDrawer = () => { $("drawer").style.display = "none"; $("drawer-back").style.display = "none"; current = null; };
 $("d-close").onclick = closeDrawer; $("drawer-back").onclick = closeDrawer;
 
+/* Upload a new file and make it THE asset for this broker/kind/variant:
+   1. upload the file to storage under a fresh timestamped path
+   2. delete every previous media_assets row for the same broker/kind/variant
+      (including "in_production" / "missing" placeholders with no file)
+   3. remove the old files from the storage bucket (best effort)
+   4. insert the new row
+   Previously step 2–3 never happened, so uploads piled up and the oldest
+   row kept winning in the admin. */
 async function uploadAsset(brokerId, kind, file, variant = "default") {
   const ext = file.name.split(".").pop().toLowerCase();
   const path = `${brokerId}/${kind}-${variant}-${Date.now()}.${ext}`;
   const { error: upErr } = await sb.storage.from("media").upload(path, file, { upsert: true });
   if (upErr) throw upErr;
+
+  const { data: old, error: oldErr } = await sb.from("media_assets")
+    .select("id, storage_path")
+    .eq("broker_id", brokerId).eq("kind", kind).eq("variant", variant);
+  if (oldErr) throw oldErr;
+
+  if (old && old.length) {
+    const { error: delErr } = await sb.from("media_assets").delete().in("id", old.map(m => m.id));
+    if (delErr) throw delErr;
+    const oldPaths = old.map(m => m.storage_path).filter(p => p && p !== path);
+    if (oldPaths.length) {
+      const { error: rmErr } = await sb.storage.from("media").remove(oldPaths);
+      if (rmErr) console.warn("Old media file(s) not removed from storage:", rmErr.message);
+    }
+  }
+
   const { error: dbErr } = await sb.from("media_assets")
     .insert({ broker_id: brokerId, kind, status: "ready", storage_path: path, priority: 10, variant });
   if (dbErr) throw dbErr;
