@@ -106,6 +106,9 @@
   <div class="scene" id="scene-board">
     <!-- title sits on the lowest layer so the winner portraits overlap it -->
     <span id="board-title" style="position:absolute; left:0px; top:60px; width:1180px; font-family:var(--font-serif); font-weight:400; font-size:118px; text-align:center; white-space:nowrap; line-height:1; color:var(--bh-white); z-index:1;"></span>
+    <!-- shown only while the board is falling back to the previous month
+         (early in a new month, before the podium can be filled) -->
+    <span id="board-period" style="position:absolute; left:0px; top:188px; width:1180px; font-family:var(--font-epic); font-size:26px; letter-spacing:0.08em; text-transform:uppercase; text-align:center; color:var(--bh-sand); z-index:1;"></span>
 
     <!-- 1st -->
     <div class="media-slot" id="p1-media" style="left:-74px; top:-100px; width:770px; height:995px; z-index:2;"></div>
@@ -185,6 +188,14 @@ const CONFIG = {
   STORAGE_BUCKET: "media",
   BG_VIDEO_URL: null,              // optional looping hero webm
   REFRESH_MINUTES: 5,              // re-fetch board data
+  // Month-rollover fallback: on the 1st of a month the current month has no
+  // (or almost no) deals yet — ingestion runs once a day for the previous
+  // day — so the board came up empty. Until the current month can fill the
+  // podium we show last month's board instead, with a small label under
+  // the title. Each scene flips to the new month on its own as soon as it
+  // has MIN_ROWS_FOR_CURRENT_MONTH brokers.
+  FALLBACK_TO_PREVIOUS_MONTH: true,
+  MIN_ROWS_FOR_CURRENT_MONTH: 3,
   CELEBRATION_POLL_SECONDS: 30,    // how often to check the approval queue
   CELEBRATION_SECONDS: 15,         // how long each celebration plays
   CELEBRATION_GAP_SECONDS: 3,      // breather between back-to-back celebrations
@@ -218,16 +229,21 @@ const rpc = async (fn, body = {}) => {
   return text ? JSON.parse(text) : null;
 };
 
-/* Month boundaries in DUBAI time, not UTC (the Aug-31 bug fix) */
-function periodBounds() {
+/* Month boundaries in DUBAI time, not UTC (the Aug-31 bug fix).
+   monthOffset: 0 = current month, -1 = previous month (used by the fallback).
+   Returns [startISO, endISO, startDateLabel, monthLabel]. */
+function periodBounds(monthOffset = 0) {
   const nowDubai = new Date(Date.now() + CONFIG.TIMEZONE_OFFSET_HOURS * 3600000);
-  const y = nowDubai.getUTCFullYear(), m = nowDubai.getUTCMonth();
+  let y = nowDubai.getUTCFullYear(), m = nowDubai.getUTCMonth() + monthOffset;
+  while (m < 0) { m += 12; y--; }
+  while (m > 11) { m -= 12; y++; }
   const pad = (n) => String(n + 1).padStart(2, "0");
   const start = `${y}-${pad(m)}-01`;
   const end = m === 11 ? `${y + 1}-01-01` : `${y}-${pad(m + 1)}-01`;
   // shift boundaries so "month" means Dubai-midnight to Dubai-midnight
   const tz = `T00:00:00+04:00`;
-  return [start + tz, end + tz, start];
+  const monthLabel = new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+  return [start + tz, end + tz, start, monthLabel];
 }
 
 const mediaUrl = (p) => !p ? null : (/^https?:\/\//.test(p) ? p : `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${p}`);
@@ -309,18 +325,35 @@ document.getElementById("rows").innerHTML = ROW_TOPS.map((top, i) => {
 /* =====================================================================
    Data
 ===================================================================== */
-const boardCache = {}; // one entry per scene (date_field + metric + deal_type)
+// one entry per scene (date_field + metric + deal_type): { rows, offset }
+// offset is 0 when the current month is shown, -1 when falling back to last month
+const boardCache = {};
 const sceneKey = (s) => s.source === "activity"
   ? `activity|${s.activity_type}|${s.metric}|${s.lead_type || "all"}`
   : `${s.date_field}|${s.metric}|${s.deal_type || "all"}`;
 
 async function fetchBoard(scene) {
-  const [start, end] = periodBounds();
-  const rows = scene.source === "activity"
-    ? await rpc("activity_leaderboard", { p_start: start, p_end: end, p_type: scene.activity_type, p_lead_type: scene.lead_type || null })
-    : await rpc("leaderboard",          { p_start: start, p_end: end, p_date_field: scene.date_field, p_deal_type: scene.deal_type || null });
+  const load = async (monthOffset) => {
+    const [start, end] = periodBounds(monthOffset);
+    const rows = scene.source === "activity"
+      ? await rpc("activity_leaderboard", { p_start: start, p_end: end, p_type: scene.activity_type, p_lead_type: scene.lead_type || null })
+      : await rpc("leaderboard",          { p_start: start, p_end: end, p_date_field: scene.date_field, p_deal_type: scene.deal_type || null });
+    return Array.isArray(rows) ? rows : [];
+  };
+
+  let rows = await load(0), offset = 0;
+
+  // Month-rollover fallback: if the current month can't fill the podium yet,
+  // show last month's board instead (only when it actually has more to show).
+  if (CONFIG.FALLBACK_TO_PREVIOUS_MONTH && rows.length < CONFIG.MIN_ROWS_FOR_CURRENT_MONTH) {
+    try {
+      const prev = await load(-1);
+      if (prev.length > rows.length) { rows = prev; offset = -1; }
+    } catch (e) { /* previous month unavailable — keep whatever the current month has */ }
+  }
+
   rows.sort((a, b) => a[scene.metric] - b[scene.metric]);
-  boardCache[sceneKey(scene)] = rows.slice(0, 8);
+  boardCache[sceneKey(scene)] = { rows: rows.slice(0, 8), offset };
 }
 
 function valueFor(entry, metric, scene) {
@@ -335,8 +368,11 @@ function valueFor(entry, metric, scene) {
 }
 
 function renderBoard(scene) {
-  const rows = boardCache[sceneKey(scene)] || [];
+  const { rows = [], offset = 0 } = boardCache[sceneKey(scene)] || {};
   document.getElementById("board-title").textContent = scene.title;
+  // label under the title only while showing the previous month
+  const [, , , monthLabel] = periodBounds(offset);
+  document.getElementById("board-period").textContent = offset < 0 ? `${monthLabel} results` : "";
   [1, 2, 3].forEach((rank, idx) => {
     const e = rows[idx];
     document.getElementById(`p${rank}-name`).textContent = e ? e.name : "—";
@@ -515,10 +551,11 @@ async function loop() {
 }
 
 function setStatus(scene, err) {
-  const [, , label] = periodBounds();
+  const { offset = 0 } = boardCache[sceneKey(scene)] || {};
+  const [, , label] = periodBounds(offset);
   document.getElementById("status").textContent = err
     ? `Refresh failed — showing last known board · ${err.message}`
-    : `${scene.title} · period from ${label} · updated ${new Date().toLocaleTimeString("en-GB")}`;
+    : `${scene.title} · period from ${label}${offset < 0 ? " (previous month fallback)" : ""} · updated ${new Date().toLocaleTimeString("en-GB")}`;
 }
 
 /* =====================================================================
